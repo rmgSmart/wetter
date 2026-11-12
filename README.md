@@ -11,7 +11,7 @@ Die Seite holt die Daten selbst für den aktuellen Standort des Geräts. Wird de
 | `index.html` | Seite, Darstellung, Himmelsanimation |
 | `daten.js` | Standort, Abruf und Aufbereitung der Wetterdaten |
 | `gigio.js` | Gigio, die Katze im Katzenmodus |
-| `sprites/` | Posen von Gigio |
+| `foto/` | Posen von Gigio, freigestellte Fotos |
 | `manifest.webmanifest`, `icon-*.png` | Web App für den Home Bildschirm |
 
 ## Datenquellen
