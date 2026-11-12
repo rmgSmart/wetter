@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Wetter">
+<meta name="theme-color" id="themecolor" content="#55636f">
+<title>Wetter</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<style>
+/* Layout: eine schmale Spalte fuers iPhone. Der Himmel (Verlauf + Canvas) und die
+   Reihenfolge der Karten richten sich nach dem Tagescharakter aus den Wetterdaten. */
+:root {
+  color-scheme: dark;
+  --sky-a: #55636f;      /* Himmel oben */
+  --sky-b: #8a959e;      /* Himmel unten */
+  --ink: #ffffff;        /* Text */
+  --soft: rgba(255,255,255,.74); /* Nebentext */
+  --panel: rgba(12,22,32,.24);   /* Kartenflaeche */
+  --line: rgba(255,255,255,.2);  /* Trennlinien */
+  --accent: #ffd66b;     /* Temperatur, Hervorhebung */
+  --wet: #8fd3ff;        /* Niederschlag */
+  --display: -apple-system, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", "Segoe UI", sans-serif;
+  --body: -apple-system, "SF Pro Text", system-ui, "Helvetica Neue", "Segoe UI", sans-serif;
+  --glass-edge: rgba(255,255,255,.34);  /* Lichtkante der Glasflaechen */
+  --lift: rgba(255,255,255,.16);        /* aufgeklappter Tag */
+}
+:root[data-sky="sonnig"]   { --sky-a:#1f6fc9; --sky-b:#79b8ee; --accent:#ffd957; }
+:root[data-sky="heiter"]   { --sky-a:#3878bd; --sky-b:#8db6dc; --accent:#ffdc6e; }
+:root[data-sky="bewoelkt"] { --sky-a:#55636f; --sky-b:#8a959e; --accent:#ffe08a; }
+:root[data-sky="regen"]    { --sky-a:#2f3d4c; --sky-b:#586b7c; --accent:#9fdcff; --wet:#9fdcff; }
+:root[data-sky="gewitter"] { --sky-a:#231f3a; --sky-b:#4a4763; --accent:#ffe45c; }
+:root[data-sky="sturm"]    { --sky-a:#2c4152; --sky-b:#5d7480; --accent:#c9f0e4; }
+:root[data-sky="hitze"]    { --sky-a:#b83a1c; --sky-b:#e48a2e; --accent:#fff1a8; }
+:root[data-sky="schnee"]   { color-scheme: light; --glass-edge: rgba(255,255,255,.8); --lift: rgba(255,255,255,.62); --sky-a:#aebdcc; --sky-b:#e9eff4; --ink:#14222f; --soft:rgba(20,34,47,.72);
+                             --panel:rgba(255,255,255,.5); --line:rgba(20,34,47,.16); --accent:#0d5ea8; --wet:#2b78c2; }
+:root[data-sky="nebel"]    { color-scheme: light; --glass-edge: rgba(255,255,255,.8); --lift: rgba(255,255,255,.62); --sky-a:#a3a9ae; --sky-b:#d6d8d9; --ink:#1b2126; --soft:rgba(27,33,38,.72);
+                             --panel:rgba(255,255,255,.42); --line:rgba(27,33,38,.16); --accent:#8a4b12; --wet:#2b6ea8; }
+:root[data-sky="frost"]    { color-scheme: light; --glass-edge: rgba(255,255,255,.8); --lift: rgba(255,255,255,.62); --sky-a:#7fb6d8; --sky-b:#dcedf6; --ink:#0d2536; --soft:rgba(13,37,54,.72);
+                             --panel:rgba(255,255,255,.48); --line:rgba(13,37,54,.16); --accent:#0a4f86; --wet:#1f6fb0; }
+:root[data-sky="nacht-klar"]   { --sky-a:#070d24; --sky-b:#24315f; --accent:#ffe9a8; }
+:root[data-sky="nacht-trueb"]  { --sky-a:#161c25; --sky-b:#353e4a; --accent:#f0dca0; }
+:root[data-sky="nacht-regen"]  { --sky-a:#0e151f; --sky-b:#283545; --accent:#9fdcff; }
+:root[data-sky="nacht-schnee"] { --sky-a:#18243a; --sky-b:#4d5d76; --accent:#dcecff; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: var(--sky-a);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+.sky { position: fixed; inset: 0; background: linear-gradient(180deg, var(--sky-a), var(--sky-b)); z-index: 0; transition: background .6s; }
+canvas#fx { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+main { position: relative; z-index: 2; max-width: 460px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 22px) calc(env(safe-area-inset-right, 0px) + 16px) calc(env(safe-area-inset-bottom, 0px) + 36px) calc(env(safe-area-inset-left, 0px) + 16px); display: flex; flex-direction: column; gap: 14px; }
+
+.hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; padding: 0 0 2px; }
+.place { text-align: center; padding-top: 6px; }
+.place .ort { font-size: 17px; font-weight: 600; }
+.place .stand { font-size: 13px; color: var(--soft); }
+.hero .stale { font-size: 13px; font-weight: 600; color: var(--accent); }
+footer { text-align: center; }
+.hero .temp { font-family: var(--display); font-weight: 200; font-size: 96px; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; padding-left: .3em; margin: 2px 0 0; }
+.hero .temp sup { font-size: 1em; vertical-align: baseline; display: inline-block; width: .3em; text-align: left; font-weight: 200; }
+.hero .cond { display: inline-flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 600; color: var(--soft); }
+.hero .cond svg { width: 30px; height: 30px; color: var(--ink); }
+.hero .range { font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.hero .range span { color: var(--soft); font-weight: 400; }
+.astro { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 16px 7px; }
+.astro svg.bogen { display: block; width: 100%; height: auto; overflow: visible; }
+.astro .bogen text { font-family: var(--body); font-variant-numeric: tabular-nums; }
+.astro .mond { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 84px; padding-left: 12px; border-left: .5px solid var(--line); text-align: center; }
+.astro .mond svg { width: 22px; height: 22px; color: var(--soft); }
+.astro .mond b { font-size: 11.5px; font-weight: 500; line-height: 1.15; color: var(--soft); }
+.summary { display: flex; align-items: center; gap: 12px; }
+.summary .big { flex: 0 0 46px; height: 46px; }
+.summary .satz { margin: 0; font-size: 17px; font-weight: 500; line-height: 1.3; letter-spacing: -.01em; text-wrap: balance; }
+
+#cards { display: flex; flex-direction: column; gap: 14px; }
+.card {
+  background: var(--panel); border: .5px solid var(--line);
+  box-shadow: inset 0 1px 0 var(--glass-edge), inset 0 -1px 0 rgba(255,255,255,.06), 0 10px 30px rgba(0,0,0,.10);
+  -webkit-backdrop-filter: blur(26px) saturate(180%); backdrop-filter: blur(26px) saturate(180%);
+}
+.card { border-radius: 26px; padding: 15px 16px 14px; }
+.card h2 { margin: 0 0 3px; font-size: 12.5px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--soft); }
+.card .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 3px; }
+.card .head h2 { margin: 0; }
+.seg { display: inline-flex; padding: 2px; border-radius: 9px; background: var(--panel); border: .5px solid var(--line); }
+.seg button { font: inherit; font-size: 13px; font-weight: 500; color: var(--soft); background: transparent; border: 0; border-radius: 7px; padding: 4px 11px; min-height: 28px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.seg button[aria-pressed="true"] { color: var(--ink); font-weight: 600; background: var(--lift); box-shadow: inset 0 .5px 0 var(--glass-edge), 0 1px 3px rgba(0,0,0,.18); }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.card .lead { font-family: var(--display); font-size: 19px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 8px; }
+.card .note { font-size: 12.5px; color: var(--soft); margin: 8px 0 0; }
+
+.hours { display: flex; gap: 0; overflow-x: auto; margin: 8px 0 0; padding: 0; border-radius: 14px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.hours::-webkit-scrollbar { display: none; }
+.hour { flex: 0 0 54px; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 0 6px;
+        background: linear-gradient(180deg, rgba(var(--tint), var(--ta)), rgba(var(--tint), calc(var(--ta) * .3))); font-variant-numeric: tabular-nums; }
+.hour .h { font-size: 13px; color: var(--soft); }
+.hour.now .h { color: var(--ink); font-weight: 600; }
+.hour svg { width: 28px; height: 28px; }
+.hour .t { font-size: 17px; font-weight: 600; }
+.hour .r { font-size: 11.5px; color: var(--wet); min-height: 15px; font-weight: 500; }
+.hour.newday { border-left: 1px solid var(--line); }
+.hour .h { white-space: nowrap; }
+
+svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--soft); font-family: var(--body); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--soft); margin-top: 6px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; background: var(--wet); }
+.legend i.maybe { opacity: .32; }
+
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin-top: 8px; }
+.tile .k { font-size: 12.5px; color: var(--soft); }
+.tile .v { font-family: var(--display); font-size: 22px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.tile .v small { font-family: var(--body); font-size: 13px; font-weight: 400; color: var(--soft); }
+
+.card h3 { margin: 14px 0 0; font-size: 12.5px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--soft); }
+.tiles.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tile .v.klein { font-size: 16px; line-height: 1.25; padding-top: 3px; }
+.week { margin-top: 8px; min-width: 0; border-radius: 14px; overflow: hidden; }
+.card, .dayrow, .detail { min-width: 0; max-width: 100%; }
+.dayrow { border-top: 1px solid var(--line); max-width: none; margin: 0; padding: 0 10px;
+          background: linear-gradient(90deg, rgba(var(--tint), var(--ta)), rgba(var(--tint), calc(var(--ta) * .35)) 62%, rgba(var(--tint), 0)); }
+.dayrow:first-child { border-top: 0; }
+.day { display: grid; grid-template-columns: 90px 26px 56px 26px minmax(0,1fr) 30px 12px; align-items: center; gap: 6px; width: 100%; padding: 8px 0;
+       font: inherit; color: inherit; background: none; border: 0; text-align: left; cursor: pointer; font-variant-numeric: tabular-nums; -webkit-tap-highlight-color: transparent; }
+.day:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.day .n { font-weight: 600; font-size: 15px; white-space: nowrap; display: flex; flex-direction: column; }
+.day .n small { font-weight: 400; font-size: 12px; color: var(--soft); }
+.day svg { width: 26px; height: 26px; }
+.day svg.chev { width: 12px; height: 12px; color: var(--soft); transition: transform .2s; }
+.day[aria-expanded="true"] svg.chev { transform: rotate(180deg); }
+.day .p { font-size: 12px; color: var(--wet); font-weight: 500; line-height: 1.15; white-space: nowrap; }
+.day .lo { color: var(--soft); text-align: right; }
+.day .hi { font-weight: 600; }
+.day .bar { height: 5px; border-radius: 3px; background: var(--line); position: relative; }
+.day .bar b { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, var(--wet), var(--accent)); }
+.dayrow.open { max-width: none; margin: 0;
+  background: linear-gradient(90deg, rgba(var(--tint), var(--ta)), rgba(var(--tint), calc(var(--ta) * .35)) 62%, rgba(var(--tint), 0)), var(--lift);
+  padding: 2px 10px 10px; border-top: .5px solid var(--glass-edge); border-bottom: .5px solid var(--glass-edge); }
+.dayrow.open + .dayrow { border-top: 0; }
+.dayrow.open .day .n { color: var(--accent); }
+.dayrow.open .day .n small { color: var(--ink); }
+.detail { padding: 12px 0 0; margin-top: 4px; border-top: .5px solid var(--line); }
+.detail .tiles { gap: 12px 10px; }
+.detail .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 0; }
+.detail .tile { min-width: 0; }
+.detail .tile .k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detail .tile .v { font-size: 19px; }
+.detail .tile .v.klein { font-size: 14px; overflow-wrap: anywhere; }
+.detail .hours { margin: 12px 0 0; padding: 0; max-width: 100%; }
+.detail .note { margin-top: 4px; }
+
+footer { font-size: 12px; color: var(--soft); padding: 0 4px; }
+footer a { color: inherit; }
+
+.draft { border-style: dashed; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chips button { font: inherit; font-size: 13.5px; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.chips button { min-height: 36px; }
+.chips button[aria-pressed="true"] { background: var(--ink); color: var(--sky-a); border-color: var(--ink); font-weight: 600; }
+.chips button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Gigio */
+#gigio-layer { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+#gigio { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; }
+#gigio .squash { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#gigio .box { position: absolute; pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; filter: drop-shadow(0 3px 4px rgba(0,0,0,.25)); }
+#gigio img { position: absolute; inset: 0; width: 100%; height: 100%; -webkit-user-drag: none; user-select: none; }
+#gigio .lids { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
+.bubble { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); white-space: nowrap; font-size: 14px; font-weight: 600; color: #14202c;
+  background: #f1f3f5; border-radius: 14px; padding: 6px 11px; box-shadow: 0 6px 18px rgba(0,0,0,.18); animation: pop .25s ease-out; }
+.bubble::after { content: ""; position: absolute; left: 50%; bottom: -4px; width: 11px; height: 11px; background: inherit; transform: translateX(-50%) rotate(45deg); border-radius: 2px; }
+.bubble.out { opacity: 0; transition: opacity .4s; }
+.zz { position: absolute; font-size: 14px; font-weight: 700; color: var(--ink); opacity: 0; animation: zz 2.6s ease-out forwards; }
+.heart { position: absolute; width: 13px; height: 12px; opacity: 0; animation: zz 2.2s ease-out forwards; }
+.bowl { position: absolute; left: 0; top: 0; width: 38px; height: 16px; transition: opacity .5s; }
+.bowl.weg { opacity: 0; }
+@keyframes pop { from { transform: translate(-50%, -80%) scale(.7); opacity: 0; } to { transform: translate(-50%, -100%) scale(1); opacity: 1; } }
+@keyframes zz { 0% { opacity: 0; transform: translate(0,0); } 20% { opacity: .9; } 100% { opacity: 0; transform: translate(14px,-30px); } }
+
+.hero { position: relative; }
+html.cat-on .hero { padding-top: 72px; }
+.hero .temp #deg.fall { animation: fall 1.5s cubic-bezier(.4,0,.9,.6) forwards; }
+.hero .temp #deg.back { animation: back .6s ease-out; }
+@keyframes fall { 0% { transform: translate(0,0) rotate(0); opacity: 1; } 20% { transform: translate(10px,-14px) rotate(40deg); } 100% { transform: translate(46px,420px) rotate(380deg); opacity: 0; } }
+@keyframes back { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: none; } }
+.feedbtn { position: absolute; right: 0; top: 0; width: 44px; height: 44px; border-radius: 50%; display: none; place-items: center; cursor: pointer; padding: 0; color: var(--ink);
+  background: var(--panel); border: .5px solid var(--line); box-shadow: inset 0 1px 0 var(--glass-edge); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+html.cat-on .feedbtn { display: grid; }
+.feedbtn svg { width: 24px; height: 24px; }
+.feedbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.catmode { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; }
+.catmode label { font-size: 16px; font-weight: 500; }
+.catmode label small { display: block; font-size: 12.5px; font-weight: 400; color: var(--soft); }
+.catmode input { appearance: none; -webkit-appearance: none; flex: 0 0 auto; width: 51px; height: 31px; border-radius: 16px; background: rgba(120,120,128,.36); position: relative; cursor: pointer; transition: background .2s; margin: 0; }
+.catmode input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.25); transition: transform .2s; }
+.catmode input:checked { background: #34c759; }
+.catmode input:checked::after { transform: translateX(20px); }
+.catmode input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="sky"></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+<main>
+  <section class="hero" aria-label="Aktuelles Wetter">
+    <button type="button" class="feedbtn" id="feedbtn" aria-label="Gigio füttern"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12.5h17l-1.6 5.2a2 2 0 0 1-1.9 1.4H7a2 2 0 0 1-1.9-1.4z"/><circle cx="9" cy="10.4" r="1.2" fill="currentColor" stroke="none"/><circle cx="12.4" cy="9.6" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.6" cy="10.6" r="1.2" fill="currentColor" stroke="none"/></svg></button>
+    <div class="stale" id="stale" hidden></div>
+    <div class="temp" id="temp"></div>
+    <div class="cond" id="cond"></div>
+    <div class="range" id="range"></div>
+  </section>
+  <section class="card summary" aria-label="Zusammenfassung"><div class="big" id="icon"></div><p class="satz" id="satz"></p></section>
+  <div id="cards"></div>
+  <section class="card catmode"><label for="catmode">Katzenmodus<small>Gigio wohnt auf der Seite</small></label><input type="checkbox" id="catmode" role="switch"></section>
+  <div class="place"><div class="ort" id="ort"></div><div class="stand" id="stand"></div></div>
+  <footer id="fuss"></footer>
+</main>
+
+<script src="daten.js"></script>
+<script src="gigio.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const de = n => String(n).replace(".", ",");
+const grad = n => Math.round(n) + "°";
+const hh = iso => +iso.slice(11, 13);
+const TAG_KURZ = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+const wtag = iso => TAG_KURZ[new Date(iso.slice(0, 10) + "T12:00:00Z").getUTCDay()];
+
+/* ---------- Symbole ---------- */
+const CLOUD = "M7.2 17.5h9.9a3.9 3.9 0 0 0 .5-7.77 5.4 5.4 0 0 0-10.3-1.1A4.45 4.45 0 0 0 7.2 17.5z";
+function icon(sym, nacht) {
+  const s = (d, extra = "") => `<path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" ${extra}/>`;
+  const sun = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--accent)"/>` +
+    [0, 45, 90, 135, 180, 225, 270, 315].map(a => { const x = Math.cos(a * Math.PI / 180), y = Math.sin(a * Math.PI / 180);
+      return `<line x1="${cx + x * (r + 1.8)}" y1="${cy + y * (r + 1.8)}" x2="${cx + x * (r + 3.6)}" y2="${cy + y * (r + 3.6)}" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/>`; }).join("");
+  const moon = (x, y, k) => `<path transform="translate(${x} ${y}) scale(${k})" d="M14.5 3.2a7.6 7.6 0 1 0 6.3 11.6A6.6 6.6 0 0 1 14.5 3.2z" fill="var(--accent)"/>`;
+  const himmel = (gross) => nacht ? (gross ? moon(1, 1, .92) : moon(8.5, -1.5, .6)) : (gross ? sun(12, 12, 4.6) : sun(16.5, 7, 3));
+  const cloud = (dy = 0, fill = "none") => `<path transform="translate(0 ${dy})" d="${CLOUD}" fill="${fill}" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>`;
+  const drops = n => [[8.5], [8.5, 13], [7.5, 11.5, 15.5]][n - 1].map(x => `<line x1="${x + 1.2}" y1="17.6" x2="${x}" y2="21" stroke="var(--wet)" stroke-width="1.6" stroke-linecap="round"/>`).join("");
+  const flakes = [8, 12, 16].map((x, i) => `<circle cx="${x}" cy="${i % 2 ? 20.6 : 19}" r="1.15" fill="currentColor"/>`).join("");
+  let g = "";
+  switch (sym) {
+    case "klar": g = himmel(true); break;
+    case "heiter": g = himmel(false) + `<g transform="translate(-2 3) scale(.86)">${cloud(0, "var(--sky-b)")}</g>`; break;
+    case "wolkig": g = himmel(false) + cloud(1.5, "var(--sky-b)"); break;
+    case "bedeckt": g = `<g opacity=".55" transform="translate(4.5 -3.5) scale(.8)">${cloud()}</g>` + cloud(2, "var(--sky-b)"); break;
+    case "nebel": g = cloud(-3.5) + s("M5 18h14M7 21h10"); break;
+    case "regen_leicht": g = cloud(-3.5) + drops(1); break;
+    case "regen": g = cloud(-3.5) + drops(2); break;
+    case "regen_stark": g = cloud(-3.5) + drops(3); break;
+    case "schneeregen": g = cloud(-3.5) + drops(1) + `<circle cx="14.5" cy="19.6" r="1.15" fill="currentColor"/>`; break;
+    case "schnee": g = cloud(-3.5) + flakes; break;
+    case "gewitter": g = cloud(-3.5) + `<path d="M12.6 14.6l-2.6 3.6h2.6l-1.4 3.6 4-4.6h-2.6l1.6-2.6z" fill="var(--accent)"/>`; break;
+    default: g = cloud(1.5);
+  }
+  return `<svg viewBox="0 0 24 24" role="img" aria-label="${sym.replace("_", " ")}">${g}</svg>`;
+}
+
+/* ---------- Mondphase (aus dem Datum berechnet) ---------- */
+function mond(datum) {
+  const SYN = 29.530588853, NEU = Date.UTC(2000, 0, 6, 18, 14);
+  const p = ((((datum - NEU) / 864e5) % SYN) + SYN) % SYN / SYN;      // 0 Neumond, 0.5 Vollmond
+  const NAMEN = ["Neumond", "Zunehmende Sichel", "Erstes Viertel", "Zunehmender Mond", "Vollmond", "Abnehmender Mond", "Letztes Viertel", "Abnehmende Sichel"];
+  // Hauptphasen nur rund einen Tag um den Termin, dazwischen Sichel oder zu/abnehmender Mond
+  const v = p * 4, nah = Math.abs(v - Math.round(v)) * SYN / 4 <= 1;
+  const name = NAMEN[nah ? (Math.round(v) % 4) * 2 : Math.floor(v) * 2 + 1];
+  const q = p <= .5 ? p : 1 - p, rx = Math.abs(Math.cos(2 * Math.PI * q)) * 7.5;
+  const lit = `<path d="M12 4.5A7.5 7.5 0 0 1 12 19.5A${rx.toFixed(2)} 7.5 0 0 ${q < .25 ? 0 : 1} 12 4.5Z" fill="currentColor"${p > .5 ? ' transform="translate(24 0) scale(-1 1)"' : ""}/>`;
+  const svg = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5" fill="currentColor" opacity=".22"/>${lit}</svg>`;
+  return { name, svg, anteil: Math.round((1 - Math.cos(2 * Math.PI * p)) / 2 * 100) };
+}
+
+/* ---------- Himmel und Reihenfolge je Tagescharakter ---------- */
+function skyFor(ch, nacht) {
+  if (!nacht) return ch;
+  if (["sonnig", "heiter", "hitze", "frost"].includes(ch)) return "nacht-klar";
+  if (["regen", "gewitter", "sturm"].includes(ch)) return "nacht-regen";
+  if (ch === "schnee") return "nacht-schnee";
+  return "nacht-trueb";
+}
+const FX = { sonnig: "sun", heiter: "sun", hitze: "sun", frost: "sun", bewoelkt: "clouds", nebel: "fog",
+             regen: "rain", gewitter: "storm", sturm: "wind", schnee: "snow" };
+function orderFor(ch) {
+  if (["regen", "gewitter", "schnee"].includes(ch)) return ["stunden", "regen", "woche", "wind", "astro", "details"];
+  if (ch === "sturm") return ["wind", "stunden", "regen", "woche", "astro", "details"];
+  return ["stunden", "regen", "woche", "wind", "astro", "details"];
+}
+
+/* ---------- Karten ---------- */
+function hourCol(s, label, cls = "") {
+  const [tint, ta] = TINT[s.symbol] || TINT.wolkig;
+  return `<div class="hour${cls}" style="--tint:${tint};--ta:${ta}"><span class="h">${label}</span>${icon(s.symbol, s.nacht)}<span class="t">${grad(s.temp)}</span><span class="r">${s.regen >= 0.1 ? de(s.regen) + " mm" : ""}</span></div>`;
+}
+function cardStunden(d) {
+  const st = d.stunden.slice(0, 25);
+  let prev = st[0].zeit.slice(0, 10);
+  const cols = st.map((s, i) => {
+    const neu = s.zeit.slice(0, 10) !== prev; prev = s.zeit.slice(0, 10);
+    const label = i === 0 ? "Jetzt" : neu ? wtag(s.zeit) + " " + hh(s.zeit) : hh(s.zeit) + " Uhr";
+    return hourCol(s, label, (i === 0 ? " now" : "") + (neu ? " newday" : ""));
+  }).join("");
+  const t = st.map(s => s.temp);
+  return `<section class="card"><h2>Nächste 24 Stunden</h2><p class="lead">${grad(Math.min(...t))} bis ${grad(Math.max(...t))}</p><div class="hours">${cols}</div></section>`;
+}
+
+function cardRegen(d) {
+  const n = d.nowcast, hatNc = !!(n && n.schritte && n.schritte.length);
+  const view = hatNc ? (regenView || (n.regnet ? "3h" : "24h")) : "24h";
+  const h = d.heute;
+  const zusatz = `<div class="tiles">
+      <div class="tile"><div class="k">Niederschlagsart</div><div class="v klein">${h.arten_24h && h.arten_24h.length ? h.arten_24h.join(", dann ") : "keiner"}</div></div></div>`;
+  const seg = hatNc ? `<div class="seg" role="group" aria-label="Zeitraum">
+      <button type="button" data-rv="3h" aria-pressed="${view === "3h"}">3 Std</button><button type="button" data-rv="24h" aria-pressed="${view === "24h"}">24 Std</button></div>` : "";
+  const kopf = lead => `<div class="head"><h2>Niederschlag</h2>${seg}</div><p class="lead">${lead}</p>`;
+  const W = 336;
+
+  if (view === "3h") {
+    const st = n.schritte, top = Math.max(0.5, Math.ceil(Math.max(...st.map(s => s.regen)) * 2) / 2), H = 96, x0 = 4, bw = (W - 34 - x0) / st.length, y = v => H - v / top * H;
+    const bars = st.map((s, i) => (s.regen > 0 ? `<rect x="${x0 + i * bw + 1.5}" y="${y(s.regen)}" width="${bw - 3}" height="${Math.max(H - y(s.regen), 1.5)}" rx="2.5" fill="var(--wet)"/>` : "") +
+      (i % 4 === 3 ? `<text x="${x0 + (i + 1) * bw}" y="${H + 14}" text-anchor="middle">${s.zeit.slice(11, 16)}</text>` : "")).join("");
+    const grid = [0, top / 2, top].map(v => `<line x1="${x0}" x2="${W - 32}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${W}" y="${y(v) + 3.5}" text-anchor="end">${de(v)}${v === top ? " mm" : ""}</text>`).join("");
+    return `<section class="card">${kopf(n.text)}
+      <svg class="chart" viewBox="0 -6 ${W} ${H + 24}" role="img" aria-label="Regen je 15 Minuten">${grid}${bars}</svg>
+      <p class="note">Je 15 Minuten, zusammen ${de(n.summe)} mm in 3 Stunden.</p>${zusatz}</section>`;
+  }
+
+  const st = d.stunden.slice(0, 24);
+  const f = d.heute.regenfenster.filter(x => x.von < st[st.length - 1].zeit);
+  const nass = st.some(s => s.regen >= 0.1), moeglich = st.some(s => (s.regen_p90 || 0) >= 0.2);
+  if (!nass && !moeglich) return `<section class="card">${kopf("Trocken in den nächsten 24 Stunden")}${zusatz}</section>`;
+  const max = Math.max(2, ...st.map(s => Math.max(s.regen, s.regen_p90 || 0)));
+  const top = Math.ceil(max), H = 96, x0 = 4, bw = (W - 30 - x0) / 24, y = v => H - v / top * H;
+  let bars = "", ticks = "";
+  st.forEach((s, i) => {
+    const x = x0 + i * bw, p90 = s.regen_p90 || 0;
+    if (p90 > s.regen) bars += `<rect x="${x + 1}" y="${y(p90)}" width="${bw - 2}" height="${H - y(p90)}" rx="2" fill="var(--wet)" opacity=".28"/>`;
+    if (s.regen > 0) bars += `<rect x="${x + 1}" y="${y(s.regen)}" width="${bw - 2}" height="${Math.max(H - y(s.regen), 1.5)}" rx="2" fill="var(--wet)"/>`;
+    const start = (hh(s.zeit) + 23) % 24;
+    if (start % 3 === 0) ticks += `<text x="${x + bw / 2}" y="${H + 14}" text-anchor="middle">${start}</text>`;
+  });
+  const grid = [0, top / 2, top].map(v => `<line x1="${x0}" x2="${W - 28}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${W}" y="${y(v) + 3.5}" text-anchor="end">${de(v)}${v === top ? " mm" : ""}</text>`).join("");
+  let lead = "Regen möglich, aber unsicher";
+  if (f.length) {
+    const a = f[0], von = hh(a.von), bis = hh(a.bis), morgen = a.bis.slice(0, 10) !== d.stand.slice(0, 10) && a.von.slice(0, 10) !== a.bis.slice(0, 10);
+    lead = (a.von <= d.stand ? `Regen bis ${bis} Uhr` : `Regen von ${von} bis ${bis} Uhr${morgen ? " früh" : ""}`) + `, ${de(a.menge)} mm`;
+  }
+  return `<section class="card">${kopf(lead)}
+    <svg class="chart" viewBox="0 -6 ${W} ${H + 24}" role="img" aria-label="Niederschlag pro Stunde in Millimeter">${grid}${bars}${ticks}</svg>
+    <div class="legend"><span><i></i>Vorhersage</span><span><i class="maybe"></i>möglich</span></div>${zusatz}</section>`;
+}
+
+function cardWind(d) {
+  const st = d.stunden.slice(0, 24), mx = Math.max(...st.map(s => s.boe));
+  if (mx < 40 && d.charakter !== "sturm") return "";
+  const top = Math.ceil(mx / 20) * 20, W = 336, H = 80, x0 = 4, xw = (W - 34 - x0) / 23, y = v => H - v / top * H;
+  const line = k => st.map((s, i) => `${i ? "L" : "M"}${(x0 + i * xw).toFixed(1)} ${y(s[k]).toFixed(1)}`).join(" ");
+  const imax = st.findIndex(s => s.boe === mx);
+  const ticks = st.map((s, i) => hh(s.zeit) % 3 === 0 ? `<text x="${x0 + i * xw}" y="${H + 14}" text-anchor="middle">${hh(s.zeit)}</text>` : "").join("");
+  const grid = [0, top / 2, top].map(v => `<line x1="${x0}" x2="${W - 32}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${W}" y="${y(v) + 3.5}" text-anchor="end">${v}${v === top ? " km/h" : ""}</text>`).join("");
+  return `<section class="card"><h2>Wind, nächste 24 Stunden</h2><p class="lead">Böen bis ${mx} km/h um ${hh(st[imax].zeit)} Uhr</p>
+    <svg class="chart" viewBox="0 -6 ${W} ${H + 24}" role="img" aria-label="Böen und Wind in km/h">${grid}
+    <path d="${line("boe")} L${x0 + 23 * xw} ${H} L${x0} ${H}Z" fill="var(--accent)" opacity=".16"/>
+    <path d="${line("boe")}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+    <path d="${line("wind")}" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="3 3" opacity=".7"/>
+    <circle cx="${x0 + imax * xw}" cy="${y(mx)}" r="3.5" fill="var(--accent)"/>${ticks}</svg>
+    <div class="legend"><span><i style="background:var(--accent)"></i>Böen</span><span><i style="background:var(--ink);opacity:.7"></i>Mittelwind</span></div></section>`;
+}
+
+const RICHT = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
+function cardDetails(d) {
+  const j = d.jetzt, h = d.heute, na = v => v == null ? "?" : v;
+  const tile = (k, v, s = "") => `<div class="tile"><div class="k">${k}</div><div class="v">${v} <small>${s}</small></div></div>`;
+  const cape = j.cape == null ? "?" : j.cape < 100 ? "keine" : j.cape < 500 ? "gering" : j.cape < 1500 ? "mäßig" : "hoch";
+  return `<section class="card"><h2>Heute im Detail</h2><div class="tiles">
+    ${tile("Tiefst und Höchstwert", grad(h.min) + " / " + grad(h.max))}
+    ${tile("Temperatur möglich", j.temp_p10 != null ? grad(j.temp_p10) + " bis " + grad(j.temp_p90) : "?")}
+    ${tile("Gefühlt", grad(j.gefuehlt))}
+    ${tile("Taupunkt", grad(j.taupunkt))}
+    ${tile("Bewölkung", j.wolken, "%")}
+    ${tile("Luftfeuchte", j.feuchte, "%")}
+    ${tile("Wind", j.wind, "km/h aus " + RICHT[Math.round(j.richtung / 45) % 8])}
+    ${tile("Böen jetzt", j.boe, "km/h" + (j.boe_p90 != null ? ", möglich " + j.boe_p90 : ""))}
+    ${tile("Böen bis Mitternacht", h.boe_max, "km/h")}
+    ${tile("Luftdruck", j.druck != null ? Math.round(j.druck) : "?", "hPa" + (h.drucktrend ? ", " + h.drucktrend : ""))}
+    ${tile("Sonnenschein heute", de(h.sonne_h), "Stunden")}
+    ${tile("Sonnenstrahlung", na(j.strahlung), "W/m²")}
+    ${tile("Regen bis Mitternacht", de(h.regen_rest), "mm")}
+    ${tile("Regenrisiko jetzt", j.risiko || "?")}
+    ${tile("Schneefallgrenze", na(j.schneefallgrenze), "m")}
+    ${tile("Gewitterneigung", cape, j.cape != null ? "CAPE " + j.cape : "")}
+  </div></section>`;
+}
+
+// Farbton je Wetterlage fuer die Wochenzeilen: [R,G,B], Deckkraft
+const TINT = { klar: ["255,196,60", .42], heiter: ["255,208,96", .34], wolkig: ["214,224,236", .2], bedeckt: ["120,132,146", .3], nebel: ["176,182,188", .3],
+               regen_leicht: ["84,160,255", .26], regen: ["64,146,255", .4], regen_stark: ["40,120,255", .55], schneeregen: ["150,200,255", .4],
+               schnee: ["232,244,255", .45], gewitter: ["160,120,255", .5] };
+function cardWoche(d) {
+  const lo = Math.min(...d.woche.map(w => w.min)), hi = Math.max(...d.woche.map(w => w.max)), sp = Math.max(hi - lo, 1);
+  const tile = (k, v, e = "") => `<div class="tile"><div class="k">${k}</div><div class="v">${v} <small>${e}</small></div></div>`;
+  const rows = d.woche.map(w => {
+    const l = (w.min - lo) / sp * 100, r = (hi - w.max) / sp * 100, offen = openDay === w.datum;
+    const p = w.regen >= 0.1 ? `${de(w.regen)} mm${w.regen_prozent != null ? "<br>" + w.regen_prozent + " %" : ""}` : "";
+    let detail = "";
+    if (offen) {
+      const st = d.stunden.filter(s => s.zeit.slice(0, 10) === w.datum);
+      const strip = st.length ? `<div class="hours">${st.map(s => hourCol(s, hh(s.zeit) + " Uhr")).join("")}</div>` : "";
+      detail = `<div class="detail"><div class="tiles">
+        ${tile("Aufgang", w.sonnenaufgang)}${tile("Untergang", w.sonnenuntergang)}
+        ${tile("Sonne", de(w.sonne_h), "h")}${tile("Böen bis", w.boe, "km/h")}
+        ${tile("Niederschlag", de(w.regen), "mm")}${tile("Regenrisiko", w.regen_prozent != null ? w.regen_prozent : "?", "%")}
+        ${w.wolken != null ? tile("Bewölkung", w.wolken, "%") + tile("Schneefall ab", w.schneefallgrenze_min != null ? w.schneefallgrenze_min : "?", "m") + `<div class="tile"><div class="k">Art</div><div class="v klein">${w.arten && w.arten.length ? w.arten.join(", ") : "trocken"}</div></div>` : ""}
+        </div>${strip}<p class="note">${w.text}</p></div>`;
+    }
+    const [tint, ta] = TINT[w.symbol] || TINT.wolkig;
+    return `<div class="dayrow${offen ? " open" : ""}" style="--tint:${tint};--ta:${ta}"><button type="button" class="day" data-day="${w.datum}" aria-expanded="${offen}">
+      <span class="n">${w.tag}<small>${de(w.sonne_h)} h Sonne</small></span>${icon(w.symbol, false)}<span class="p">${p}</span><span class="lo">${grad(w.min)}</span><span class="bar"><b style="left:${l}%;right:${r}%"></b></span><span class="hi">${grad(w.max)}</span>
+      <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>${detail}</div>`;
+  }).join("");
+  return `<section class="card"><h2>Diese Woche</h2><div class="week">${rows}</div><p class="note">Tag antippen für Details.</p></section>`;
+}
+
+const LOOKS = [["", "Echt"], ["sonnig", "Sonnig"], ["heiter", "Heiter"], ["bewoelkt", "Bewölkt"], ["regen", "Regen"], ["gewitter", "Gewitter"],
+               ["sturm", "Sturm"], ["schnee", "Schnee"], ["nebel", "Nebel"], ["hitze", "Hitze"], ["frost", "Frost"]];
+function cardEntwurf() {
+  return `<section class="card draft"><h2>Nur im Entwurf</h2><p class="lead">So gestaltet sich die Seite an anderen Tagen um</p>
+    <p class="note" style="margin-top:0">Die Auswahl ändert Himmel, Animation und Reihenfolge der Karten. Die Zahlen bleiben die echten vom ${DATA.stand.slice(8, 10)}.${DATA.stand.slice(5, 7)}.</p>
+    <div class="chips" id="looks">${LOOKS.map(([k, n]) => `<button type="button" data-look="${k}" aria-pressed="${k === look}">${n}</button>`).join("")}
+    <button type="button" data-nacht="1" aria-pressed="${nachtOverride === true}">Nacht</button></div></section>`;
+}
+
+/* ---------- Aufbau ---------- */
+let DATA = null, DEMO = false, look = "", nachtOverride = null, openDay = null, regenView = null;
+function render() {
+  const d = DATA, ch = look || d.charakter, nacht = nachtOverride === null ? d.nacht : nachtOverride;
+  document.documentElement.dataset.sky = skyFor(ch, nacht);
+  setFx(nacht && FX[ch] === "sun" ? "stars" : FX[ch] || "clouds");
+  $("ort").textContent = d.ort;
+  const alt = (Date.now() - new Date(d.stand).getTime()) / 60000;
+  const datum = `${d.stand.slice(8, 10)}.${d.stand.slice(5, 7)}.${d.stand.slice(0, 4)}, ${d.stand.slice(11, 16)} Uhr`;
+  $("stand").textContent = "Stand " + datum + (d.standortFrei ? "" : ", Standort nicht freigegeben");
+  const veraltet = !DEMO && alt > 45;
+  $("stale").hidden = !veraltet;
+  $("stale").textContent = veraltet ? `Daten nicht aktuell, Stand ${d.stand.slice(11, 16)} Uhr` : "";
+  $("temp").innerHTML = `${Math.round(d.jetzt.temp)}<sup id="deg">°</sup>`;
+  const naechste = d.stunden.slice(0, 12), nass = naechste.find(s => s.regen >= 0.1);
+  $("icon").innerHTML = icon(nass ? nass.symbol : d.jetzt.symbol, nass ? nass.nacht : d.nacht);
+  $("cond").innerHTML = `${icon(d.jetzt.symbol, d.nacht)}${d.jetzt.text}`;
+  $("range").innerHTML = `H: ${grad(d.heute.max)} &nbsp;T: ${grad(d.heute.min)} <span>&nbsp;· gefühlt ${grad(d.jetzt.gefuehlt)}</span>`;
+  $("themecolor").content = getComputedStyle(document.documentElement).getPropertyValue("--sky-a").trim();
+  const m = mond(new Date(d.stand));
+  const mi = t => +t.slice(0, 2) * 60 + +t.slice(3, 5);
+  const a = mi(d.heute.sonnenaufgang), u = mi(d.heute.sonnenuntergang), n = mi(d.stand.slice(11, 16)), dauer = u - a;
+  const t = (n - a) / dauer, oben = t >= 0 && t <= 1;
+  const bx = k => (1 - k) * (1 - k) * 34 + 2 * (1 - k) * k * 110 + k * k * 186, by = k => (1 - k) * (1 - k) * 26 + 2 * (1 - k) * k * -12 + k * k * 26;
+  const weg = oben ? `<path d="M34 26 Q${34 + (110 - 34) * t} ${26 + (-12 - 26) * t} ${bx(t)} ${by(t)}" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" opacity=".85"/>` : "";
+  const punkt = oben ? `<circle cx="${bx(t)}" cy="${by(t)}" r="3.6" fill="var(--accent)"/>` : "";
+  const astroHTML = `<section class="card astro" aria-label="Sonne und Mond"><svg class="bogen" viewBox="0 0 220 42" role="img" aria-label="Sonnenaufgang ${d.heute.sonnenaufgang}, Sonnenuntergang ${d.heute.sonnenuntergang}">
+      <path d="M34 26 Q110 -12 186 26" fill="none" stroke="var(--soft)" stroke-width="1.1" stroke-dasharray="2 4" stroke-linecap="round" opacity=".55"/>${weg}
+      <line x1="10" x2="210" y1="26" y2="26" stroke="var(--line)" stroke-width="1"/>${punkt}
+      <text x="34" y="40" text-anchor="middle" font-size="12" font-weight="500" fill="var(--ink)">${d.heute.sonnenaufgang}</text>
+      <text x="186" y="40" text-anchor="middle" font-size="12" font-weight="500" fill="var(--ink)">${d.heute.sonnenuntergang}</text>
+      <text x="110" y="40" text-anchor="middle" font-size="10.5" fill="var(--soft)">${Math.floor(dauer / 60)} h ${dauer % 60} min Tag</text></svg>
+    <div class="mond">${m.svg}<b>${m.name}</b></div></section>`;
+  $("satz").textContent = d.heute.satz;
+  const cards = { astro: () => astroHTML, stunden: cardStunden, regen: cardRegen, wind: cardWind, details: cardDetails, woche: cardWoche };
+  $("cards").innerHTML = orderFor(ch).map(k => cards[k](d)).join("") + (DEMO ? cardEntwurf() : "");
+  $("fuss").innerHTML = `Daten: ${d.quellen.join(", ")}${d.standortFrei ? ", Ortsname © OpenStreetMap" : ""}.` + (d.modelllauf ? ` Modelllauf ${new Date(d.modelllauf).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })} Uhr.` : "");
+  const wl = nacht ? "nacht" : ["sonnig", "heiter", "hitze", "frost"].includes(ch) ? "sonne" : ch === "sturm" ? "wind" : "regen";
+  Gigio.setWeather(wl);
+  document.querySelectorAll("[data-rv]").forEach(b => b.onclick = () => { regenView = b.dataset.rv; render(); });
+  document.querySelectorAll(".day[data-day]").forEach(b => b.onclick = () => { openDay = openDay === b.dataset.day ? null : b.dataset.day; render(); });
+  const lk = $("looks");
+  if (lk) lk.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.nacht) nachtOverride = nachtOverride === true ? null : true; else look = b.dataset.look;
+    render();
+  };
+}
+
+let laedt = false, zuletzt = 0;
+async function load() {
+  if (laedt) return; laedt = true;
+  try {
+    DATA = await Wetter.laden(); zuletzt = Date.now();
+    try { localStorage.setItem("letzte", JSON.stringify(DATA)); } catch (e) {}
+  } catch (e) {
+    if (!DATA) { try { DATA = JSON.parse(localStorage.getItem("letzte")); } catch (e2) {} }
+  }
+  laedt = false;
+  if (!DATA) { $("satz").textContent = "Keine Wetterdaten erreichbar. Bitte später noch einmal versuchen."; return; }
+  render();
+}
+
+/* ---------- Himmel Animation (Canvas) ---------- */
+const cv = $("fx"), cx = cv.getContext("2d");
+let fx = "", parts = [], raf = 0, W = 0, H = 0, flash = 0;
+const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const rnd = (a, b) => a + Math.random() * (b - a);
+function size() { const r = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight; cv.width = W * r; cv.height = H * r; cx.setTransform(r, 0, 0, r, 0, 0); }
+function setFx(n) {
+  if (n === fx) return; fx = n; parts = [];
+  const mk = (c, f) => { for (let i = 0; i < c; i++) parts.push(f(i)); };
+  if (n === "rain" || n === "storm") mk(80, () => ({ x: rnd(0, W), y: rnd(0, H), l: rnd(10, 22), v: rnd(9, 15) }));
+  if (n === "wind") mk(46, () => ({ x: rnd(0, W), y: rnd(0, H), l: rnd(30, 90), v: rnd(10, 20) }));
+  if (n === "snow") mk(70, () => ({ x: rnd(0, W), y: rnd(0, H), r: rnd(1, 3.2), v: rnd(.4, 1.3), p: rnd(0, 6) }));
+  if (n === "stars") mk(70, () => ({ x: rnd(0, W), y: rnd(0, H * .7), r: rnd(.4, 1.4), p: rnd(0, 6) }));
+  if (n === "clouds" || n === "fog") mk(n === "fog" ? 7 : 5, i => ({ x: rnd(-200, W), y: n === "fog" ? rnd(0, H) : rnd(-40, H * .45), r: rnd(180, 320), v: rnd(.08, .25), a: n === "fog" ? .16 : .11 }));
+  cancelAnimationFrame(raf); frame(0);
+}
+function frame(t) {
+  cx.clearRect(0, 0, W, H);
+  const light = getComputedStyle(document.documentElement).colorScheme === "light";
+  const ink = light ? "40,60,80" : "255,255,255";
+  if (fx === "sun") {
+    const k = 1 + Math.sin(t / 2400) * .04, g = cx.createRadialGradient(W * .86, 60, 0, W * .86, 60, 300 * k);
+    g.addColorStop(0, "rgba(255,236,160,.75)"); g.addColorStop(.25, "rgba(255,226,140,.28)"); g.addColorStop(1, "rgba(255,226,140,0)");
+    cx.fillStyle = g; cx.fillRect(0, 0, W, H);
+  }
+  if (fx === "rain" || fx === "storm") {
+    cx.strokeStyle = `rgba(${ink},.3)`; cx.lineWidth = 1.2; cx.beginPath();
+    for (const p of parts) { cx.moveTo(p.x, p.y); cx.lineTo(p.x - p.l * .22, p.y + p.l); p.y += p.v; p.x -= p.v * .22; if (p.y > H) { p.y = -20; p.x = rnd(0, W + 80); } }
+    cx.stroke();
+    if (fx === "storm") { if (!still && Math.random() < .004) flash = 1; if (flash > .02) { cx.fillStyle = `rgba(255,255,230,${flash * .35})`; cx.fillRect(0, 0, W, H); flash *= .86; } }
+  }
+  if (fx === "wind") {
+    cx.strokeStyle = `rgba(${ink},.2)`; cx.lineWidth = 1.2; cx.lineCap = "round"; cx.beginPath();
+    for (const p of parts) { cx.moveTo(p.x, p.y); cx.lineTo(p.x + p.l, p.y - p.l * .06); p.x += p.v; if (p.x > W + 20) { p.x = -100; p.y = rnd(0, H); } }
+    cx.stroke();
+  }
+  if (fx === "snow") {
+    cx.fillStyle = light ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.8)";
+    for (const p of parts) { cx.beginPath(); cx.arc(p.x + Math.sin(t / 900 + p.p) * 8, p.y, p.r, 0, 7); cx.fill(); p.y += p.v; if (p.y > H + 4) { p.y = -4; p.x = rnd(0, W); } }
+  }
+  if (fx === "stars") for (const p of parts) { cx.fillStyle = `rgba(255,255,255,${.45 + Math.sin(t / 700 + p.p) * .35})`; cx.beginPath(); cx.arc(p.x, p.y, p.r, 0, 7); cx.fill(); }
+  if (fx === "clouds" || fx === "fog") for (const p of parts) {
+    const g = cx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+    g.addColorStop(0, `rgba(255,255,255,${p.a})`); g.addColorStop(1, "rgba(255,255,255,0)");
+    cx.fillStyle = g; cx.save(); cx.translate(0, p.y * .45); cx.scale(1, .55); cx.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2); cx.restore();
+    p.x += p.v; if (p.x - p.r > W) p.x = -p.r;
+  }
+  if (!still) raf = requestAnimationFrame(frame);
+}
+addEventListener("resize", () => { size(); const f = fx; fx = ""; setFx(f); });
+size();
+try { DATA = JSON.parse(localStorage.getItem("letzte")); if (DATA) render(); } catch (e) {}   // letzten Stand sofort zeigen
+load();
+setInterval(load, 10 * 60 * 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - zuletzt > 5 * 60 * 1000) load(); });
+
+/* ---------- Katzenmodus ---------- */
+const schalter = $("catmode");
+function katze(an) {
+  document.documentElement.classList.toggle("cat-on", an);
+  try { localStorage.setItem("katzenmodus", an ? "1" : "0"); } catch (e) {}
+  if (an) requestAnimationFrame(() => Gigio.an()); else Gigio.aus();
+}
+try { schalter.checked = localStorage.getItem("katzenmodus") === "1"; } catch (e) {}
+schalter.addEventListener("change", () => katze(schalter.checked));
+$("feedbtn").addEventListener("click", () => Gigio.do("feed"));
+katze(schalter.checked);
+</script>
+</body>
+</html>
