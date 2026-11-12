@@ -295,7 +295,12 @@ const Gigio = (() => {
     const flip = cat.dir * SPR[cat.pose].face;
     root.style.transform = `translate(${(cat.x + jx).toFixed(1)}px,${(cat.y - tapY - (cat.act === "spin" ? cat.hopY : 0)).toFixed(1)}px) scaleX(${flip})`;
     squash.style.transform = `rotate(${(rot * flip).toFixed(2)}deg) scale(${sx.toFixed(3)},${sy.toFixed(3)})`;
-    if (cat.bubble) { const hp = headPoint(); cat.bubble.style.left = hp[0].toFixed(1) + "px"; cat.bubble.style.top = (hp[1] - tapY - 4).toFixed(1) + "px"; }
+    if (cat.bubble) {   // Sprechblase im sichtbaren Bereich halten, die Spitze zeigt weiter auf Gigio
+      const hp = headPoint(), bw = cat.bubble.offsetWidth, W = layer.clientWidth;
+      const x = Math.max(bw / 2 + 6, Math.min(W - bw / 2 - 6, hp[0])), y = Math.max(cat.bubble.offsetHeight + 4, hp[1] - tapY - 4);
+      cat.bubble.style.left = x.toFixed(1) + "px"; cat.bubble.style.top = y.toFixed(1) + "px";
+      cat.bubble.style.setProperty("--tail", Math.max(-bw / 2 + 14, Math.min(bw / 2 - 14, hp[0] - x)).toFixed(1) + "px");
+    }
     if (cat.bowl) { const q = plats[cat.bowl.plat]; cat.bowl.el.style.transform = `translate(${(cat.bowl.x - 19).toFixed(1)}px,${(q.y - 15.5).toFixed(1)}px)`; }
     raf = requestAnimationFrame(frame);
   }
