@@ -50,8 +50,15 @@ const Gigio = (() => {
   const visible = p => { const yy = p.y + main.getBoundingClientRect().top; return yy > 80 && yy < innerHeight - 20; };
 
   /* ---------- Darstellung ---------- */
+  // Weicher Uebergang: das alte Bild blendet aus, waehrend das neue einblendet
   function setPose(n, federn = true) {
     if (cat.pose === n) return;
+    if (cat.pose && !still) {
+      const alt = box.cloneNode(true); alt.classList.add("ghost"); alt.removeAttribute("tabindex"); alt.removeAttribute("role");
+      squash.appendChild(alt); const ms = federn ? 260 : 110;
+      alt.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing: "ease-out" }).onfinish = () => alt.remove();
+      img.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, easing: "ease-in" });
+    }
     cat.pose = n; const s = SPR[n];
     img.src = `foto/${n}.png`;
     box.style.width = s.w * K + "px"; box.style.height = s.h * K + "px";
