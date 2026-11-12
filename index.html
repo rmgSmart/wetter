@@ -191,6 +191,12 @@ footer a { color: inherit; }
 
 .hero { position: relative; }
 html.cat-on .hero { padding-top: 72px; }
+.hero .loc { font-size: 12.5px; font-weight: 500; color: var(--soft); font-variant-numeric: tabular-nums; }
+html.cat-on .hero .loc { position: absolute; top: 12px; left: 52px; right: 52px; }
+.place .standort { margin-top: 8px; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); background: var(--panel); border: .5px solid var(--line);
+  border-radius: 999px; padding: 8px 14px; min-height: 36px; cursor: pointer; }
+.place .standort:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.place .hinweis { font-size: 12.5px; color: var(--soft); margin-top: 6px; max-width: 34ch; margin-left: auto; margin-right: auto; }
 .hero .temp #deg.fall { animation: fall 1.5s cubic-bezier(.4,0,.9,.6) forwards; }
 .hero .temp #deg.back { animation: back .6s ease-out; }
 @keyframes fall { 0% { transform: translate(0,0) rotate(0); opacity: 1; } 20% { transform: translate(10px,-14px) rotate(40deg); } 100% { transform: translate(46px,420px) rotate(380deg); opacity: 0; } }
@@ -216,6 +222,7 @@ html.cat-on .feedbtn { display: grid; }
 <main>
   <section class="hero" aria-label="Aktuelles Wetter">
     <button type="button" class="feedbtn" id="feedbtn" aria-label="Gigio füttern"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12.5h17l-1.6 5.2a2 2 0 0 1-1.9 1.4H7a2 2 0 0 1-1.9-1.4z"/><circle cx="9" cy="10.4" r="1.2" fill="currentColor" stroke="none"/><circle cx="12.4" cy="9.6" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.6" cy="10.6" r="1.2" fill="currentColor" stroke="none"/></svg></button>
+    <div class="loc" id="loc"></div>
     <div class="stale" id="stale" hidden></div>
     <div class="temp" id="temp"></div>
     <div class="cond" id="cond"></div>
@@ -223,8 +230,8 @@ html.cat-on .feedbtn { display: grid; }
   </section>
   <section class="card summary" aria-label="Zusammenfassung"><div class="big" id="icon"></div><p class="satz" id="satz"></p></section>
   <div id="cards"></div>
-  <section class="card catmode"><label for="catmode">Katzenmodus<small>Gigio wohnt auf der Seite</small></label><input type="checkbox" id="catmode" role="switch"></section>
-  <div class="place"><div class="ort" id="ort"></div><div class="stand" id="stand"></div></div>
+  <section class="card catmode"><label for="catmode">Gigio Mode<small>Gigio wohnt auf der Seite</small></label><input type="checkbox" id="catmode" role="switch"></section>
+  <div class="place"><div class="ort" id="ort"></div><div class="stand" id="stand"></div><div id="standortHilfe"></div></div>
   <footer id="fuss"></footer>
 </main>
 
@@ -294,9 +301,8 @@ function skyFor(ch, nacht) {
 const FX = { sonnig: "sun", heiter: "sun", hitze: "sun", frost: "sun", bewoelkt: "clouds", nebel: "fog",
              regen: "rain", gewitter: "storm", sturm: "wind", schnee: "snow" };
 function orderFor(ch) {
-  if (["regen", "gewitter", "schnee"].includes(ch)) return ["stunden", "regen", "woche", "wind", "astro", "details"];
   if (ch === "sturm") return ["wind", "stunden", "regen", "woche", "astro", "details"];
-  return ["stunden", "regen", "woche", "wind", "astro", "details"];
+  return ["stunden", "regen", "wind", "woche", "astro", "details"];
 }
 
 /* ---------- Karten ---------- */
@@ -364,7 +370,7 @@ function cardRegen(d) {
 
 function cardWind(d) {
   const st = d.stunden.slice(0, 24), mx = Math.max(...st.map(s => s.boe));
-  if (mx < 40 && d.charakter !== "sturm") return "";
+  if (mx < 50 && d.charakter !== "sturm") return "";
   const top = Math.ceil(mx / 20) * 20, W = 336, H = 80, x0 = 4, xw = (W - 34 - x0) / 23, y = v => H - v / top * H;
   const line = k => st.map((s, i) => `${i ? "L" : "M"}${(x0 + i * xw).toFixed(1)} ${y(s[k]).toFixed(1)}`).join(" ");
   const imax = st.findIndex(s => s.boe === mx);
@@ -451,7 +457,15 @@ function render() {
   $("ort").textContent = d.ort;
   const alt = (Date.now() - new Date(d.stand).getTime()) / 60000;
   const datum = `${d.stand.slice(8, 10)}.${d.stand.slice(5, 7)}.${d.stand.slice(0, 4)}, ${d.stand.slice(11, 16)} Uhr`;
-  $("stand").textContent = "Stand " + datum + (d.standortFrei ? "" : ", Standort nicht freigegeben");
+  $("stand").textContent = "Stand " + datum;
+  zeigeAlter();
+  const GRUND = { 0: "Dieser Browser gibt keinen Standort heraus.", 1: "Der Standort wurde nicht freigegeben.", 2: "Der Standort ist gerade nicht verfügbar.", 3: "Die Standortabfrage hat zu lange gedauert." };
+  $("standortHilfe").innerHTML = d.standortFrei ? "" : `<button type="button" class="standort" id="standortBtn">Meinen Standort verwenden</button>
+    <p class="hinweis">${GRUND[d.standortFehler] ?? GRUND[1]} Gezeigt wird 1010 Wien.${d.standortFehler === 1 ? " Am iPhone unter Settings > Privacy & Security > Location Services > Safari Websites auf \"While Using the App\" stellen." : ""}</p>`;
+  const sb = $("standortBtn"); if (sb) sb.onclick = () => {
+    sb.disabled = true; sb.textContent = "Standort wird abgefragt …";
+    navigator.geolocation?.getCurrentPosition(() => { zuletzt = 0; load(); }, () => { sb.disabled = false; sb.textContent = "Meinen Standort verwenden"; }, { timeout: 15000 });
+  };
   const veraltet = !DEMO && alt > 45;
   $("stale").hidden = !veraltet;
   $("stale").textContent = veraltet ? `Daten nicht aktuell, Stand ${d.stand.slice(11, 16)} Uhr` : "";
@@ -492,6 +506,13 @@ function render() {
 }
 
 let laedt = false, zuletzt = 0;
+function zeigeAlter() {
+  if (!DATA) return;
+  const min = Math.max(0, Math.round((Date.now() - new Date(DATA.stand).getTime()) / 60000));
+  const alter = min < 1 ? "gerade aktualisiert" : min < 60 ? `vor ${min} min aktualisiert` : `vor ${Math.round(min / 60)} h aktualisiert`;
+  $("loc").textContent = `${DATA.ort} · ${alter}`;
+}
+setInterval(zeigeAlter, 30000);
 async function load() {
   if (laedt) return; laedt = true;
   try {
@@ -561,7 +582,7 @@ load();
 setInterval(load, 10 * 60 * 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - zuletzt > 5 * 60 * 1000) load(); });
 
-/* ---------- Katzenmodus ---------- */
+/* ---------- Gigio Mode ---------- */
 const schalter = $("catmode");
 function katze(an) {
   document.documentElement.classList.toggle("cat-on", an);

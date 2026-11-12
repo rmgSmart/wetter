@@ -3,7 +3,7 @@
    Liefert dasselbe Datenformat wie frueher fetch_wetter.py. */
 "use strict";
 const Wetter = (() => {
-  const FALLBACK = { lat: 48.2085, lon: 16.3721, ort: "Wien 1010" };
+  const FALLBACK = { lat: 48.2085, lon: 16.3721, ort: "1010 Wien" };
   const GEO = "https://dataset.api.hub.geosphere.at/v1/timeseries/forecast";
   const GEO_BOX = { s: 43.1, n: 51.4, w: 5.2, e: 22.4 };         // Gebiet des 1 km Modells
   const TAGE = 7;
@@ -74,20 +74,21 @@ const Wetter = (() => {
   }
 
   /* ---------- Standort ---------- */
+  // Fehlercodes: 0 nicht unterstuetzt, 1 abgelehnt, 2 nicht verfuegbar, 3 Zeitueberschreitung
   function standort() {
     return new Promise(res => {
-      if (!navigator.geolocation) return res(null);
-      navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lon: p.coords.longitude }), () => res(null),
-        { enableHighAccuracy: false, timeout: 9000, maximumAge: 10 * 60 * 1000 });
+      if (!navigator.geolocation || !window.isSecureContext) return res({ fehler: 0 });
+      navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lon: p.coords.longitude }), e => res({ fehler: e.code }),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 5 * 60 * 1000 });
     });
   }
   async function ortsname(lat, lon) {
-    const key = `ort:${lat.toFixed(2)},${lon.toFixed(2)}`;
+    const key = `ort2:${lat.toFixed(3)},${lon.toFixed(3)}`;
     try { const c = localStorage.getItem(key); if (c) return c; } catch (e) {}
     try {
-      const j = await hole(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=14&accept-language=de`, 8000);
+      const j = await hole(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=18&accept-language=de`, 8000);
       const a = j.address || {}, stadt = a.city || a.town || a.village || a.municipality || a.county || "";
-      const name = (a.country_code === "at" && a.postcode && stadt === "Wien") ? `Wien ${a.postcode}` : stadt || "Unbekannter Ort";
+      const name = [a.postcode, stadt].filter(Boolean).join(" ") || "Unbekannter Ort";
       try { localStorage.setItem(key, name); } catch (e) {}
       return name;
     } catch (e) { return `${lat.toFixed(2)}, ${lon.toFixed(2)}`; }
@@ -246,7 +247,7 @@ const Wetter = (() => {
 
   /* ---------- Ablauf ---------- */
   async function laden() {
-    const pos = await standort();
+    const st = await standort(), pos = st.lat != null ? st : null;
     const lat = pos ? pos.lat : FALLBACK.lat, lon = pos ? pos.lon : FALLBACK.lon;
     const ortP = pos ? ortsname(lat, lon) : Promise.resolve(FALLBACK.ort);
     const imGebiet = lat > GEO_BOX.s && lat < GEO_BOX.n && lon > GEO_BOX.w && lon < GEO_BOX.e;
@@ -269,7 +270,7 @@ const Wetter = (() => {
     if (!stunden.length) throw new Error("Keine Wetterdaten erreichbar");
     const ort = await ortP;
     const d = baue(stunden, om?.daily || null, new Date(), ort, lat, lon, quellen, lauf, nc);
-    d.standortFrei = !!pos;
+    d.standortFrei = !!pos; d.standortFehler = pos ? null : st.fehler;
     return d;
   }
   return { laden, _test: { baue, stundenGeo, nowcast } };

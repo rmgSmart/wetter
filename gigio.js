@@ -94,14 +94,16 @@ const Gigio = (() => {
 
   /* ---------- Verhalten ---------- */
   const GEWICHT = {
-    regen: { sit: 4, doze: 2.5, sleep: 1.2, play: .8, bound: 2, jump: 1.6, talk: 1.4, knock: .5, turn: 1.2 },
-    sonne: { sit: 3, doze: 1.6, sleep: 1.4, play: 2.2, bound: 2.6, jump: 2.2, talk: 1.2, knock: .6, turn: 1.2 },
-    nacht: { sit: 1.2, doze: 2.5, sleep: 6, play: .3, bound: .6, jump: .5, talk: .5, knock: .2, turn: .6 },
-    wind:  { sit: 4, doze: 2, sleep: 1.2, play: .6, bound: 1.2, jump: .8, talk: 1.6, knock: .5, turn: 1.6 },
+    regen: { sit: 2.5, doze: 1.6, sleep: .8, play: 1.2, bound: 2.4, jump: 2, talk: 1.4, knock: .6, turn: 1.4, shake: 1.4, spin: .8, stretch: 1, pounce: 1.6, catch: 1.6, zoom: .5, yawn: .8 },
+    sonne: { sit: 2, doze: 1, sleep: 1, play: 2.4, bound: 3, jump: 2.6, talk: 1.2, knock: .7, turn: 1.4, shake: 0, spin: 1.2, stretch: 1.6, pounce: 2, catch: 1.4, zoom: .9, yawn: .8 },
+    nacht: { sit: 1.2, doze: 2, sleep: 4.5, play: .4, bound: .8, jump: .6, talk: .5, knock: .3, turn: .8, shake: 0, spin: .3, stretch: .8, pounce: .5, catch: .6, zoom: .3, yawn: 1.5 },
+    wind:  { sit: 3, doze: 1.4, sleep: 1, play: .8, bound: 1.4, jump: 1, talk: 1.6, knock: .6, turn: 1.8, shake: 1, spin: .6, stretch: .8, pounce: 1.2, catch: 1.6, zoom: .4, yawn: .6 },
   };
+  const FANG = { regen: ["Tropfen!", "Hab ihn!"], sonne: ["Sonnenstrahl!", "Fliege!"], nacht: ["Motte!", "Was war das?"], wind: ["Blatt!", "Hab es!"] };
   function waehle() {
     const w = { ...GEWICHT[weather] };
-    if (still) for (const k of ["bound", "jump", "knock", "play"]) w[k] = 0;
+    if (still) for (const k of ["bound", "jump", "knock", "play", "shake", "spin", "pounce", "catch", "zoom"]) w[k] = 0;
+    if (cat.act && w[cat.act]) w[cat.act] *= .3;            // nicht zweimal dasselbe hintereinander
     let sum = 0; for (const k in w) sum += w[k];
     let r = Math.random() * sum; for (const k in w) { r -= w[k]; if (r <= 0) return k; }
     return "sit";
@@ -118,11 +120,25 @@ const Gigio = (() => {
     if (cat.bowl && !["feed", "eat", "bound", "jump"].includes(name)) schuesselWeg();   // Napf weg, wenn er etwas anderes macht
     cat.act = name; cat.t = 0;
     switch (name) {
-      case "sit": setPose("sitzen"); cat.dur = rnd(4, 8); break;
-      case "turn": setPose("sitzen"); cat.dir *= -1; cat.pop = 1; cat.dur = rnd(2, 4); break;
-      case "doze": setPose("sitzen_zu"); cat.dur = rnd(5, 10); cat.zzT = 1.5; break;
-      case "sleep": setPose("schlaf"); cat.dur = rnd(10, 20); cat.zzT = 1; break;
-      case "play": setPose("spiel"); cat.dur = rnd(3, 5); if (Math.random() < .5) sag(pick(SAGT.spiel), 1600); break;
+      case "sit": setPose("sitzen"); cat.dur = rnd(2.5, 5); break;
+      case "turn": setPose("sitzen"); cat.dir *= -1; cat.pop = 1; cat.dur = rnd(1.2, 2.5); if (Math.random() < .4) cat.queue.unshift("turn"); break;
+      case "doze": setPose("sitzen_zu"); cat.dur = rnd(4, 7); cat.zzT = 1.5; break;
+      case "yawn": setPose("sitzen_zu"); cat.dur = 1.4; cat.pop = 1; if (Math.random() < .5) sag("Gähn.", 1200); break;
+      case "shake": setPose("sitzen"); cat.dur = 1.1; if (Math.random() < .6) sag(weather === "regen" ? "Brrr!" : "Schüttel.", 1200); break;
+      case "spin": setPose("sitzen"); cat.dur = 1.7; cat.spinT = 0; if (Math.random() < .4) sag("Wo ist mein Schwanz?", 1700); break;
+      case "stretch": setPose("sitzen"); cat.dur = 1.6; break;
+      case "pounce": {   // ducken, mit dem Po wackeln, dann losspringen
+        setPose("sitzen"); cat.dur = .7;
+        const z = cat.x + cat.dir * rnd(50, 95);
+        if (z < p.x1 || z > p.x2) cat.dir *= -1;
+        cat.queue.unshift("pounceGo"); break;
+      }
+      case "pounceGo": springe(cat.plat, cat.x + cat.dir * rnd(50, 95), 28, .5); cat.dur = 99; break;
+      case "catch": springe(cat.plat, cat.x + cat.dir * rnd(0, 10), rnd(30, 42), .55); cat.dur = 99; setTimeout(() => sag(pick(FANG[weather])), 380); break;
+      case "zoom": cat.fast = true; cat.boundTo = cat.x < (p.x1 + p.x2) / 2 ? p.x2 : p.x1; cat.dur = 99; cat.act = "bound"; nextBound();
+        if (Math.random() < .5) sag(pick(["Wuuusch!", "Huiii!", "Platz da!"]), 1400); break;
+      case "sleep": setPose("schlaf"); cat.dur = rnd(8, 15); cat.zzT = 1; break;
+      case "play": setPose("spiel"); cat.dur = rnd(2.5, 4); if (Math.random() < .5) sag(pick(SAGT.spiel), 1600); break;
       case "talk": setPose("sitzen"); cat.dur = 3.2; sag(pick(Math.random() < .6 ? SAGT[weather] : SAGT.allg)); break;
       case "fuatta": setPose("sitzen"); cat.dur = 4.5; sag(pick(SAGT.fuatta), 3800); break;
       case "bound": {   // ein paar kleine Kaetzchenspruenge auf derselben Flaeche
@@ -174,9 +190,9 @@ const Gigio = (() => {
   }
   function nextBound() {
     const d = cat.boundTo - cat.x;
-    if (Math.abs(d) < 6) { cat.hop = null; fertig(); return; }
-    const step = Math.sign(d) * Math.min(Math.abs(d), rnd(34, 58));
-    springe(cat.plat, cat.x + step, rnd(10, 16), .42);
+    if (Math.abs(d) < 6) { cat.hop = null; cat.fast = false; fertig(); return; }
+    const step = Math.sign(d) * Math.min(Math.abs(d), cat.fast ? rnd(62, 86) : rnd(34, 58));
+    springe(cat.plat, cat.x + step, cat.fast ? rnd(8, 12) : rnd(10, 16), cat.fast ? .28 : .42);
   }
   function fertig() {
     if (cat.act === "eat") {
@@ -233,7 +249,7 @@ const Gigio = (() => {
       rot = (k < .5 ? -10 : 8) * cat.dir;
       if (k >= 1) {
         cat.plat = h.to; cat.y = q.y; cat.hop = null; cat.hopY = 0; cat.pop = 1;
-        if (cat.act === "bound") { setPose("sitzen"); if (Math.abs(cat.boundTo - cat.x) > 6) setTimeout(() => cat.act === "bound" && !cat.hop && nextBound(), 120); else fertig(); }
+        if (cat.act === "bound") { setPose("sitzen"); if (Math.abs(cat.boundTo - cat.x) > 6) setTimeout(() => cat.act === "bound" && !cat.hop && nextBound(), cat.fast ? 40 : 120); else { cat.fast = false; fertig(); } }
         else fertig();
       }
     } else {
@@ -258,6 +274,15 @@ const Gigio = (() => {
     let tapY = 0;
     if (cat.tapHop > 0) { cat.tapHop -= dt; tapY = Math.sin((1 - cat.tapHop / .45) * Math.PI) * 10; }
     if (cat.act === "play" && !still) rot += Math.sin(now / 160) * 6;
+    let jx = 0;
+    if (!still && !cat.hop) {
+      const env = Math.sin(Math.PI * Math.min(1, cat.t / cat.dur));
+      if (cat.act === "shake") { jx = Math.sin(now / 22) * 2.6 * env; rot += Math.sin(now / 30) * 5 * env; }
+      if (cat.act === "stretch") { sx += .16 * env; sy -= .12 * env; }
+      if (cat.act === "pounce") { sy -= .14 * Math.min(1, cat.t / .25); sx += .06; rot += Math.sin(now / 45) * 2.5; }
+      if (cat.act === "spin") { cat.spinT += dt; if (cat.spinT > .14) { cat.spinT = 0; cat.dir *= -1; } cat.hopY = Math.abs(Math.sin(now / 90)) * 3; }
+      if (cat.act === "yawn") { sy += .05 * env; }
+    }
     if (cat.act === "eat" && !still) { rot += Math.sin(now / 150) * 4 * cat.dir; cat.heartT -= dt; if (cat.heartT < 0) { herz(); cat.heartT = 1.1; } }
 
     // Blinzeln (nur in der Sitzpose mit offenen Augen)
@@ -268,7 +293,7 @@ const Gigio = (() => {
     if ((cat.act === "sleep" || cat.act === "doze") && !still) { cat.zzT -= dt; if (cat.zzT < 0) { zz(); cat.zzT = cat.act === "sleep" ? 2.2 : 3.2; } }
 
     const flip = cat.dir * SPR[cat.pose].face;
-    root.style.transform = `translate(${cat.x.toFixed(1)}px,${(cat.y - tapY).toFixed(1)}px) scaleX(${flip})`;
+    root.style.transform = `translate(${(cat.x + jx).toFixed(1)}px,${(cat.y - tapY - (cat.act === "spin" ? cat.hopY : 0)).toFixed(1)}px) scaleX(${flip})`;
     squash.style.transform = `rotate(${(rot * flip).toFixed(2)}deg) scale(${sx.toFixed(3)},${sy.toFixed(3)})`;
     if (cat.bubble) { const hp = headPoint(); cat.bubble.style.left = hp[0].toFixed(1) + "px"; cat.bubble.style.top = (hp[1] - tapY - 4).toFixed(1) + "px"; }
     if (cat.bowl) { const q = plats[cat.bowl.plat]; cat.bowl.el.style.transform = `translate(${(cat.bowl.x - 19).toFixed(1)}px,${(q.y - 15.5).toFixed(1)}px)`; }
