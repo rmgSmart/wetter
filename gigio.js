@@ -101,21 +101,21 @@ const Gigio = (() => {
 
   /* ---------- Verhalten ---------- */
   const GEWICHT = {
-    regen: { sit: 2.5, streng: 1.4, walk: 3, jump: 1.6, talk: 1.3, angelehnt: 1.2, sphinx: 1.6, seite: .8, ruecken: .8, kante: 1.2, gaehnen: .8, putzen: 1.8, rollen: .7, hoch: 1.4, knock: .5, turn: 1.2 },
-    sonne: { sit: 2, streng: 1.2, walk: 3, jump: 2, talk: 1.1, angelehnt: 1.4, sphinx: 1.8, seite: 1.6, ruecken: 1.8, kante: 1.4, gaehnen: .8, putzen: 1.2, rollen: 1.6, hoch: 1.4, knock: .6, turn: 1.2 },
-    nacht: { sit: 1, streng: .8, walk: 1.2, jump: .5, talk: .4, angelehnt: 1.8, sphinx: 1.4, seite: 2.8, ruecken: 3, kante: 2.2, gaehnen: 1.4, putzen: .8, rollen: .4, hoch: .5, knock: .2, turn: .5 },
-    wind:  { sit: 2.8, streng: 1.6, walk: 2, jump: 1, talk: 1.5, angelehnt: 1, sphinx: 2, seite: .8, ruecken: .6, kante: .8, gaehnen: .6, putzen: 1.4, rollen: .5, hoch: 1.6, knock: .5, turn: 1.6 },
+    regen: { sit: 1.4, streng: 1, walk: 4.5, spazier: 2.2, jump: 2, talk: 1.2, angelehnt: .8, sphinx: 1, seite: .5, ruecken: .5, kante: .8, gaehnen: .6, putzen: 1.2, rollen: 1.4, hoch: 1.6, jagd: 1.6, zoomies: .9, ausreissen: .6, starren: .6, betteln: .5, knock: .6, turn: 1 },
+    sonne: { sit: 1.2, streng: .8, walk: 4.5, spazier: 2.4, jump: 2.4, talk: 1, angelehnt: 1, sphinx: 1.2, seite: 1, ruecken: 1.2, kante: 1, gaehnen: .6, putzen: .9, rollen: 2.2, hoch: 1.6, jagd: 2.2, zoomies: 1.2, ausreissen: .8, starren: .6, betteln: .5, knock: .7, turn: 1 },
+    nacht: { sit: .8, streng: .6, walk: 1.6, spazier: .8, jump: .6, talk: .4, angelehnt: 1.6, sphinx: 1.2, seite: 2.6, ruecken: 2.8, kante: 2, gaehnen: 1.2, putzen: .6, rollen: .5, hoch: .6, jagd: .6, zoomies: .5, ausreissen: .3, starren: .8, betteln: .3, knock: .2, turn: .4 },
+    wind:  { sit: 1.8, streng: 1.2, walk: 3.5, spazier: 1.6, jump: 1.2, talk: 1.4, angelehnt: .8, sphinx: 1.2, seite: .5, ruecken: .4, kante: .6, gaehnen: .5, putzen: 1, rollen: .9, hoch: 2, jagd: 1.8, zoomies: .7, ausreissen: .5, starren: .6, betteln: .4, knock: .6, turn: 1.4 },
   };
   function waehle() {
     const w = { ...GEWICHT[weather] };
-    if (still) for (const k of ["walk", "jump", "knock", "rollen", "hoch"]) w[k] = 0;
+    if (still) for (const k of ["walk", "spazier", "jump", "knock", "rollen", "hoch", "jagd", "zoomies", "ausreissen"]) w[k] = 0;
     if (cat.act && w[cat.act]) w[cat.act] *= .25;
     let sum = 0; for (const k in w) sum += w[k];
     let r = Math.random() * sum; for (const k in w) { r -= w[k]; if (r <= 0) return k; }
     return "sit";
   }
-  function geheZu(x, tempo = rnd(34, 46)) {
-    const p = plats[cat.plat]; x = Math.max(p.x1, Math.min(p.x2, x));
+  function geheZu(x, tempo = rnd(34, 46), frei = false) {
+    const p = plats[cat.plat]; if (!frei) x = Math.max(p.x1, Math.min(p.x2, x));
     if (Math.abs(x - cat.x) < 8) return false;
     cat.walk = { to: x, v: tempo }; cat.dir = x >= cat.x ? 1 : -1; setPose(GEHEN[cat.step % 4], false); return true;
   }
@@ -129,20 +129,55 @@ const Gigio = (() => {
     if (cat.bowl && !["feed", "eat", "walk", "jump"].includes(name)) schuesselWeg();
     cat.act = name; cat.t = 0;
     switch (name) {
-      case "sit": setPose("sitzen"); cat.dur = lang(3, 6); break;
+      case "sit": setPose("sitzen"); cat.dur = lang(2, 4); break;
       case "streng": setPose("streng"); cat.dur = lang(2.5, 5); if (Math.random() < .3) sag(pick(SAGT.streng), 1600); break;
       case "turn": setPose("sitzen"); cat.dir *= -1; cat.pop = 1; cat.dur = lang(1.2, 2.5); break;
       case "talk": setPose("sitzen"); cat.dur = 3.2; sag(pick(Math.random() < .6 ? SAGT[weather] : SAGT.allg)); break;
-      case "angelehnt": setPose("angelehnt"); cat.dur = lang(6, 12); cat.zzT = 2; break;
-      case "sphinx": setPose("sphinx"); cat.dur = lang(5, 10); break;
-      case "seite": setPose("seite"); cat.dur = lang(8, 16); cat.zzT = 1; break;
-      case "ruecken": setPose("ruecken"); cat.dur = lang(8, 16); cat.zzT = 1; break;
-      case "kante": setPose("kante"); cat.dur = lang(6, 12); cat.zzT = 2.5; break;
+      case "angelehnt": setPose("angelehnt"); cat.dur = weather === "nacht" ? lang(8, 14) : lang(4, 8); cat.zzT = 2; break;
+      case "sphinx": setPose("sphinx"); cat.dur = lang(3, 6); break;
+      case "seite": setPose("seite"); cat.dur = weather === "nacht" ? lang(10, 18) : lang(5, 9); cat.zzT = 1; break;
+      case "ruecken": setPose("ruecken"); cat.dur = weather === "nacht" ? lang(10, 18) : lang(4, 8); cat.zzT = 1; break;
+      case "kante": setPose("kante"); cat.dur = weather === "nacht" ? lang(8, 14) : lang(4, 8); cat.zzT = 2.5; break;
       case "gaehnen": setPose("gaehnen"); cat.dur = 1.8; if (Math.random() < .4) sag("Gähn.", 1200); break;
       case "putzen": setPose("putzen"); cat.dur = lang(3, 5.5); break;
       case "rollen": setPose("rollen"); cat.dur = lang(2.5, 4); if (Math.random() < .5) sag(pick(SAGT.spiel), 1800); break;
       case "hoch": setPose("hoch"); cat.dur = lang(2, 3.5); if (Math.random() < .6) setTimeout(() => cat.act === "hoch" && sag(pick(SAGT.fang[weather]), 1500), 500); break;
       case "fuatta": setPose("sitzen"); cat.dur = 4.5; sag(pick(SAGT.fuatta), 3800); break;
+      case "spazier": {   // kleiner Rundgang: hin und her, vielleicht auf eine andere Karte und wieder zurueck
+        const q = [];
+        for (let k = 0; k < 2 + Math.floor(Math.random() * 3); k++) q.push(Math.random() < .3 ? "jump" : "walk");
+        if (Math.random() < .5) q.push(pick(["putzen", "streng", "sphinx", "hoch"]));
+        cat.queue = q; return start(q.shift());
+      }
+      case "jagd": {      // etwas Unsichtbares jagen: schnell hin, hochschauen, auf den Ruecken werfen
+        cat.queue = ["hoch", Math.random() < .6 ? "rollen" : "walk"];
+        cat.act = "walk"; cat.dur = 99;
+        if (!geheZu(rnd(p.x1, p.x2), 95)) { cat.queue = []; return start("hoch"); }
+        if (Math.random() < .5) sag(pick(SAGT.fang[weather]), 1300);
+        break;
+      }
+      case "zoomies": {   // Rennanfall: dreimal schnell hin und her, dann umfallen
+        cat.queue = []; const n = 2 + Math.floor(Math.random() * 3);
+        for (let k = 0; k < n; k++) cat.queue.push("renne");
+        cat.queue.push(Math.random() < .5 ? "ruecken" : "rollen");
+        sag(pick(["Wuuusch!", "Huiii!", "Platz da!"]), 1400); return start(cat.queue.shift());
+      }
+      case "renne": cat.act = "walk"; cat.dur = 99; if (!geheZu(cat.x < (p.x1 + p.x2) / 2 ? p.x2 - rnd(0, 20) : p.x1 + rnd(0, 20), 150)) fertig(); break;
+      case "ausreissen": {  // rennt aus dem Bild und kommt woanders von der anderen Seite zurueck
+        const rechts = Math.random() < .5, W = layer.clientWidth;
+        cat.act = "walk"; cat.dur = 99; cat.ausreissen = rechts ? 1 : -1;
+        geheZu(rechts ? W + 70 : -70, 130, true);
+        if (Math.random() < .6) sag(pick(["Tschüss!", "Ich muss weg!", "Bin gleich wieder da."]), 1300);
+        break;
+      }
+      case "starren": setPose("streng"); cat.dur = lang(4, 7); setTimeout(() => cat.act === "starren" && sag(pick(["...", "Ich sehe dich.", "Hast du was gesagt?"]), 2200), 900); break;
+      case "betteln": {     // geht zum Futterknopf und schaut ihn an
+        const t = plats.findIndex(q => q.kind === "temp");
+        if (cat.plat !== t) { cat.queue = ["betteln"]; return start("jump", { to: t }); }
+        cat.queue = ["hoch", "streng"]; cat.act = "walk"; cat.dur = 99;
+        geheZu(plats[t].x2, 60); setTimeout(() => sag(pick(["Der Napf ist leer.", "Nur so ein Hinweis.", "Futter wäre nett."]), 2200), 1800);
+        break;
+      }
       case "walk":
         cat.dur = 99;
         if (!geheZu(opts.x ?? rnd(p.x1, p.x2), opts.tempo)) return start("sit");
@@ -200,7 +235,7 @@ const Gigio = (() => {
       schuesselWeg(); lastFed = Date.now(); try { localStorage.setItem("gigio-fed", String(lastFed)); } catch (e) {}
       cat.queue = ["putzen", "sphinx"]; setTimeout(() => sag(pick(SAGT.danke)), 300);
     }
-    if (cat.act === "walk" && !cat.queue.length && Math.random() < .5) cat.queue.push(pick(["sit", "streng", "sphinx", "putzen"]));
+    if (cat.act === "walk" && !cat.queue.length && Math.random() < .35) cat.queue.push(pick(["sit", "streng", "sphinx", "putzen", "hoch"]));
     start(cat.queue.length ? cat.queue.shift() : waehle());
   }
 
@@ -254,7 +289,12 @@ const Gigio = (() => {
         const schritt = 9 * (cat.walk.v > 60 ? 1.4 : 1);
         if (cat.stepDist > schritt) { cat.stepDist = 0; cat.step++; setPose(GEHEN[cat.step % 4], false); }
         sy += Math.abs(Math.sin(cat.step * Math.PI / 2 + cat.stepDist / schritt * Math.PI / 2)) * .012;
-        if (Math.abs(d) < 1) { cat.walk = null; fertig(); }
+        if (cat.ausreissen && (cat.x > layer.clientWidth + 60 || cat.x < -60)) {
+          const vis = plats.map((q, i) => i).filter(i => visible(plats[i]) && i !== cat.plat), von = -cat.ausreissen;
+          cat.plat = vis.length ? pick(vis) : cat.plat; const q = plats[cat.plat]; cat.y = q.y;
+          cat.x = von < 0 ? -50 : layer.clientWidth + 50; cat.ausreissen = 0;
+          cat.walk = { to: rnd(q.x1, q.x2), v: 90 }; cat.dir = cat.walk.to >= cat.x ? 1 : -1; cat.queue = [pick(["streng", "putzen", "sit"])];
+        } else if (Math.abs(d) < 1) { cat.walk = null; fertig(); }
       } else {
         cat.x = Math.max(p.x1 - 6, Math.min(p.x2 + 6, cat.x));
         if (cat.t >= cat.dur) fertig();
