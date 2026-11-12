@@ -414,6 +414,16 @@ function cardDetails(d) {
 const TINT = { klar: ["255,196,60", .42], heiter: ["255,208,96", .34], wolkig: ["214,224,236", .2], bedeckt: ["120,132,146", .3], nebel: ["176,182,188", .3],
                regen_leicht: ["84,160,255", .26], regen: ["64,146,255", .4], regen_stark: ["40,120,255", .55], schneeregen: ["150,200,255", .4],
                schnee: ["232,244,255", .45], gewitter: ["160,120,255", .5] };
+// Farbe eines Tages aus den Werten: Regenmenge zuerst, sonst Anteil der Sonnenstunden am Tageslicht
+function tagesfarbe(w) {
+  if (w.symbol === "gewitter") return TINT.gewitter;
+  if (w.symbol === "schnee" && w.regen >= .3) return TINT.schnee;
+  if (w.regen >= .5) { const k = Math.min(1, w.regen / 10); return ["64,146,255", +(.2 + .35 * k).toFixed(2)]; }
+  const mi = t => +t.slice(0, 2) * 60 + +t.slice(3, 5), licht = Math.max(1, (mi(w.sonnenuntergang) - mi(w.sonnenaufgang)) / 60);
+  const anteil = Math.min(1, (w.sonne_h || 0) / licht);
+  if (anteil >= .25) return ["255,196,60", +(.12 + .36 * anteil).toFixed(2)];
+  return w.symbol === "nebel" ? TINT.nebel : ["120,132,146", +(.3 - .2 * anteil / .25).toFixed(2)];
+}
 function cardWoche(d) {
   const lo = Math.min(...d.woche.map(w => w.min)), hi = Math.max(...d.woche.map(w => w.max)), sp = Math.max(hi - lo, 1);
   const tile = (k, v, e = "") => `<div class="tile"><div class="k">${k}</div><div class="v">${v} <small>${e}</small></div></div>`;
@@ -431,7 +441,7 @@ function cardWoche(d) {
         ${w.wolken != null ? tile("Bewölkung", w.wolken, "%") + tile("Schneefall ab", w.schneefallgrenze_min != null ? w.schneefallgrenze_min : "?", "m") + `<div class="tile"><div class="k">Art</div><div class="v klein">${w.arten && w.arten.length ? w.arten.join(", ") : "trocken"}</div></div>` : ""}
         </div>${strip}<p class="note">${w.text}</p></div>`;
     }
-    const [tint, ta] = TINT[w.symbol] || TINT.wolkig;
+    const [tint, ta] = tagesfarbe(w);
     return `<div class="dayrow${offen ? " open" : ""}" style="--tint:${tint};--ta:${ta}"><button type="button" class="day" data-day="${w.datum}" aria-expanded="${offen}">
       <span class="n">${w.tag}<small>${de(w.sonne_h)} h Sonne</small></span>${icon(w.symbol, false)}<span class="p">${p}</span><span class="lo">${grad(w.min)}</span><span class="bar"><b style="left:${l}%;right:${r}%"></b></span><span class="hi">${grad(w.max)}</span>
       <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>${detail}</div>`;

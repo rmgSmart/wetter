@@ -223,7 +223,11 @@ const Wetter = (() => {
           boe: Math.max(...st.map(s => s.boe)), sonne_h: r1(st.reduce((a, s) => a + s.sonne_min, 0) / 60), symbol: g, text: t, quelle: quellen[0],
           wolken: Math.round(st.reduce((a, s) => a + s.wolken, 0) / st.length), schneefallgrenze_min: gr.length ? Math.min(...gr) : null, arten: arten(st) });
       } else if (o) {
-        let [g, t] = wmo(o.weather_code); if (g === "bedeckt" && o.sunshine_duration >= 18000) [g, t] = ["wolkig", "Wolkig"];
+        let [g, t] = wmo(o.weather_code);
+        const sonneH = o.sunshine_duration / 3600;
+        if (NASS.has(g) && g !== "schnee" && g !== "gewitter" && o.precipitation_sum < .3)      // Regensymbol ohne nennenswerten Regen
+          [g, t] = sonneH >= 6 ? ["heiter", "Heiter"] : sonneH >= 2 ? ["wolkig", "Wolkig"] : ["bedeckt", "Bedeckt"];
+        else if (g === "bedeckt" && sonneH >= 5) [g, t] = ["wolkig", "Wolkig"];
         Object.assign(e, { min: r1(o.temperature_2m_min), max: r1(o.temperature_2m_max), regen: r1(o.precipitation_sum), regen_prozent: o.precipitation_probability_max,
           boe: Math.round(o.wind_gusts_10m_max), sonne_h: r1(o.sunshine_duration / 3600), symbol: g, text: t, quelle: "Open-Meteo" });
       } else continue;
