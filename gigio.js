@@ -73,6 +73,12 @@ const Gigio = (() => {
     sp6: { w: 113, h: 70, ax: .5, ay: 1, hx: .85, hy: .1, face: 1, k: 1.38 },
     sp7: { w: 132, h: 65, ax: .5, ay: 1, hx: .85, hy: .1, face: 1, k: 1.38 },
     sp8: { w: 138, h: 62, ax: .5, ay: 1, hx: .85, hy: .1, face: 1, k: 1.38 },
+    lauf1: { w: 229, h: 166, ax: 0.491, ay: 1, hx: 0.913, hy: .3, face: 1, k: 0.9 },
+    lauf2: { w: 229, h: 166, ax: 0.491, ay: 1, hx: 0.913, hy: .3, face: 1, k: 0.9 },
+    lauf3: { w: 236, h: 163, ax: 0.506, ay: 1, hx: 0.915, hy: .3, face: 1, k: 0.9 },
+    lauf4: { w: 234, h: 165, ax: 0.501, ay: 1, hx: 0.915, hy: .3, face: 1, k: 0.9 },
+    lauf5: { w: 222, h: 155, ax: 0.474, ay: 1, hx: 0.910, hy: .3, face: 1, k: 0.9 },
+    lauf6: { w: 216, h: 180, ax: 0.460, ay: 1, hx: 0.907, hy: .3, face: 1, k: 0.9 },
     seitsitz:  { w: 208, h: 207, ax: .5, ay: 1, hx: .8,  hy: .03, face: 1, k: .8 },
     sitz_a:    { w: 156, h: 189, ax: .5, ay: 1, hx: .55, hy: .05, face: 1 },
     sitz_b:    { w: 193, h: 190, ax: .5, ay: 1, hx: .72, hy: .03, face: 1 },
@@ -86,8 +92,8 @@ const Gigio = (() => {
     kopf_m:    { w: 104, h: 213, ax: .5, ay: 1, hx: .5,  hy: .03, face: 1 },
     kopf_r:    { w: 103, h: 212, ax: .5, ay: 1, hx: .55, hy: .03, face: 1 },
   };
-  const GEHEN = ["g1", "g2", "g3", "g4", "g5", "g6", "g7"], RENNEN = ["renn1", "renn2", "renn3"];
-  const GANG = /^(g\d|renn|ducken|st8|sp8)/, LIEGT = new Set(["sphinx", "seite", "ruecken", "kante", "liegen_vorne", "liegen_lang", "rollen", "ro8", "hl8"]);
+  const GEHEN = ["g1", "g2", "g3", "g4", "g5", "g6", "g7"], RENNEN = ["lauf1", "lauf2", "lauf3", "lauf4", "lauf5", "lauf6"];
+  const GANG = /^(g\d|renn|lauf|ducken|st8|sp8)/, LIEGT = new Set(["sphinx", "seite", "ruecken", "kante", "liegen_vorne", "liegen_lang", "rollen", "ro8", "hl8"]);
   const reihe = (p, von, bis, t) => { const l = []; for (let i = von; von <= bis ? i <= bis : i >= bis; i += von <= bis ? 1 : -1) l.push([p + i, t]); return l; };
   const K = .27;                                   // px am Bildschirm je Bildpixel
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -140,7 +146,7 @@ const Gigio = (() => {
   }
 
   // Bewegungsablauf: Zwischenposen abspielen (aufstehen, hinsetzen, hinlegen), dann die Zielpose
-  const gangPose = () => cat.walk && cat.walk.v > 85 ? RENNEN[cat.step % 3] : GEHEN[cat.step % 7];
+  const gangPose = () => cat.walk && cat.walk.v > 85 ? RENNEN[cat.step % 6] : GEHEN[cat.step % 7];
   function folge(list, end) {
     if (!list.length || still) { if (end) setPose(end); return 0; }
     cat.seq = { list, i: 0, t: 0, end }; setPose(list[0][0]);
@@ -412,9 +418,9 @@ const Gigio = (() => {
       else if (cat.walk) {           // echter Schrittzyklus mit vier Fotos
         const d = cat.walk.to - cat.x, s = Math.min(Math.abs(d), cat.walk.v * dt);
         cat.x += Math.sign(d) * s; cat.dir = Math.sign(d) || cat.dir; cat.stepDist = (cat.stepDist || 0) + s;
-        const renn = cat.walk.v > 85, schritt = renn ? 15 : 6.5;
+        const renn = cat.walk.v > 85, schritt = renn ? 11 : 6.5;
         if (cat.stepDist > schritt) { cat.stepDist = 0; cat.step++; setPose(gangPose(), false); }
-        sy += Math.abs(Math.sin((cat.step + cat.stepDist / schritt) * Math.PI / (renn ? 1.5 : 3.5))) * (renn ? .03 : .01);
+        sy += Math.abs(Math.sin((cat.step + cat.stepDist / schritt) * Math.PI / (renn ? 3 : 3.5))) * (renn ? .03 : .01);
         if (cat.ausreissen && (cat.x > layer.clientWidth + 60 || cat.x < -60)) {
           const vis = plats.map((q, i) => i).filter(i => visible(plats[i]) && i !== cat.plat), von = -cat.ausreissen;
           cat.plat = vis.length ? pick(vis) : cat.plat; const q = plats[cat.plat]; cat.y = q.y;
