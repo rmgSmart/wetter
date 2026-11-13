@@ -79,7 +79,7 @@ const Wetter = (() => {
     return new Promise(res => {
       if (!navigator.geolocation || !window.isSecureContext) return res({ fehler: 0 });
       navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lon: p.coords.longitude }), e => res({ fehler: e.code }),
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 5 * 60 * 1000 });
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 });
     });
   }
   async function ortsname(lat, lon) {
