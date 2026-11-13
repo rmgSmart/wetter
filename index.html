@@ -236,8 +236,8 @@ html.cat-on .feedbtn { display: grid; }
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611130857"></script>
-<script src="gigio.js?v=202611130857"></script>
+<script src="daten.js?v=202611130917"></script>
+<script src="gigio.js?v=202611130917"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -605,7 +605,7 @@ setInterval(load, 10 * 60 * 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - zuletzt > 5 * 60 * 1000) load(); });
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611130857";
+const VERSION = "202611130917";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
