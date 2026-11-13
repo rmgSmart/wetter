@@ -307,8 +307,19 @@ function orderFor(ch) {
 }
 
 /* ---------- Karten ---------- */
+// Farbe einer Stunde, gleiche Logik wie bei den Tagen: Regen blau, Sonne gelb, Wolken grau, klare Nacht dunkelblau
+function stundenfarbe(s) {
+  if (s.symbol === "gewitter") return TINT.gewitter;
+  if (s.symbol === "schnee" && s.regen >= .1) return TINT.schnee;
+  if (s.regen >= .1) { const k = Math.min(1, s.regen / 3); return ["64,146,255", +(.18 + .37 * k).toFixed(2)]; }
+  if (s.nacht) return s.wolken < 50 ? ["40,60,140", .35] : ["120,132,146", .22];
+  if (s.symbol === "nebel") return TINT.nebel;
+  const sonne = s.sonne_min != null ? s.sonne_min / 60 : 1 - s.wolken / 100;
+  if (sonne >= .25 || s.wolken < 40) return ["255,196,60", +(.14 + .3 * Math.max(sonne, 1 - s.wolken / 100)).toFixed(2)];
+  return ["120,132,146", +(.14 + .16 * s.wolken / 100).toFixed(2)];
+}
 function hourCol(s, label, cls = "") {
-  const [tint, ta] = TINT[s.symbol] || TINT.wolkig;
+  const [tint, ta] = stundenfarbe(s);
   return `<div class="hour${cls}" style="--tint:${tint};--ta:${ta}"><span class="h">${label}</span>${icon(s.symbol, s.nacht)}<span class="t">${grad(s.temp)}</span><span class="r">${s.regen >= 0.1 ? de(s.regen) + " mm" : ""}</span></div>`;
 }
 function cardStunden(d) {
