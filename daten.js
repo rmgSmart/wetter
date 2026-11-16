@@ -94,6 +94,57 @@ const Wetter = (() => {
     } catch (e) { return `${lat.toFixed(2)}, ${lon.toFixed(2)}`; }
   }
 
+  /* ---------- Messwerte der naechsten Station (TAWES, alle 10 Minuten) ---------- */
+  const STATION = "https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min";
+  const km = (a, b, c, d) => { const R = Math.PI / 180, x = (d - b) * R * Math.cos((a + c) / 2 * R), y = (c - a) * R; return Math.hypot(x, y) * 6371; };
+  async function naechsteStation(lat, lon) {
+    const key = `station:${lat.toFixed(2)},${lon.toFixed(2)}`;
+    try { const c = JSON.parse(localStorage.getItem(key)); if (c && Date.now() - c.t < 30 * 864e5) return c.s; } catch (e) {}
+    const meta = await hole(STATION + "/metadata", 20000);
+    const alle = (meta.stations || []).filter(x => x.is_active !== false && x.lat != null && x.lon != null)
+      .map(x => ({ id: String(x.id), name: x.name, km: km(lat, lon, +x.lat, +x.lon) })).sort((a, b) => a.km - b.km);
+    const s = alle[0] && alle[0].km <= 20 ? alle[0] : null;
+    try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), s })); } catch (e) {}
+    return s;
+  }
+  const schoen = n => String(n || "").toLowerCase().replace(/(^|[\s\/\-])([a-zäöü])/g, (m, a, b) => a + b.toUpperCase()).replace(/\//g, " ");
+  async function messung(lat, lon) {
+    const st = await naechsteStation(lat, lon); if (!st) return null;
+    const j = await hole(`${STATION}?parameters=TL,RF,FF,FFX,DD,RR,PRED,SO,TP&station_ids=${st.id}&output_format=geojson`, 15000);
+    const p = j.features?.[0]?.properties?.parameters, t = j.timestamps?.[j.timestamps.length - 1]; if (!p || !t) return null;
+    const v = k => { const d = p[k]?.data; const x = d ? d[d.length - 1] : null; return x == null || isNaN(x) ? null : +x; };
+    if (v("TL") == null) return null;
+    const zeit = new Date(t); if (Date.now() - zeit.getTime() > 45 * 60000) return null;       // zu alt
+    return { station: schoen(st.name), km: r1(st.km), zeit: iso(zeit), temp: r1(v("TL")), feuchte: v("RF") != null ? Math.round(v("RF")) : null,
+      wind: v("FF") != null ? Math.round(v("FF") * 3.6) : null, boe: v("FFX") != null ? Math.round(v("FFX") * 3.6) : null, richtung: v("DD"),
+      regen10: v("RR"), druck: v("PRED") != null ? r1(v("PRED")) : null, sonne10: v("SO") != null ? Math.round(v("SO") / 60) : null, taupunkt: v("TP") != null ? r1(v("TP")) : null };
+  }
+
+  /* ---------- UV und Pollen (Open-Meteo, Copernicus) ---------- */
+  const POLLEN = { alder_pollen: ["Erle", 10, 70], birch_pollen: ["Birke", 10, 70], grass_pollen: ["Gräser", 5, 30], mugwort_pollen: ["Beifuß", 5, 30], olive_pollen: ["Olive", 10, 70], ragweed_pollen: ["Ragweed", 5, 20] };
+  async function luft(lat, lon) {
+    const j = await hole(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&timezone=auto&forecast_days=1&hourly=${Object.keys(POLLEN).join(",")}`, 12000);
+    const h = j.hourly || {}, out = [];
+    for (const k in POLLEN) {
+      const w = (h[k] || []).filter(x => x != null); if (!w.length) continue;
+      const m = Math.max(...w), [name, mittel, hoch] = POLLEN[k];
+      if (m >= mittel) out.push({ name, wert: Math.round(m), stufe: m >= hoch ? "hoch" : "mäßig" });
+    }
+    return out;
+  }
+  const uvText = u => u == null ? null : u < 3 ? "niedrig" : u < 6 ? "mäßig" : u < 8 ? "hoch" : u < 11 ? "sehr hoch" : "extrem";
+
+  /* ---------- Ortssuche ---------- */
+  async function suche(text) {
+    const j = await hole(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(text)}&format=jsonv2&addressdetails=1&limit=6&accept-language=de`, 10000);
+    const seen = new Set();
+    return (j || []).map(x => {
+      const a = x.address || {}, stadt = a.city || a.town || a.village || a.municipality || a.hamlet || a.county || (x.display_name || "").split(",")[0];
+      const name = [a.postcode, stadt].filter(Boolean).join(" "), land = a.country_code && a.country_code !== "at" ? a.country : (a.state || "");
+      return { name, zusatz: [a.suburb || a.city_district, land].filter(Boolean).join(", "), lat: +x.lat, lon: +x.lon };
+    }).filter(o => o.name && !seen.has(o.name + o.zusatz) && seen.add(o.name + o.zusatz));
+  }
+
   /* ---------- Stunden ---------- */
   function stundenGeo(nwp, ens, lat, lon) {
     const e = new Map(ens ? reihe(ens).map(x => [x.t.getTime(), x.v]) : []);
@@ -250,16 +301,17 @@ const Wetter = (() => {
   }
 
   /* ---------- Ablauf ---------- */
-  async function laden() {
-    const st = await standort(), pos = st.lat != null ? st : null;
+  async function laden(wahl) {
+    const st = wahl ? { lat: wahl.lat, lon: wahl.lon } : await standort(), pos = st.lat != null ? st : null;
     const lat = pos ? pos.lat : FALLBACK.lat, lon = pos ? pos.lon : FALLBACK.lon;
-    const ortP = pos ? ortsname(lat, lon) : Promise.resolve(FALLBACK.ort);
+    const ortP = wahl ? Promise.resolve(wahl.name) : pos ? ortsname(lat, lon) : Promise.resolve(FALLBACK.ort);
     const imGebiet = lat > GEO_BOX.s && lat < GEO_BOX.n && lon > GEO_BOX.w && lon < GEO_BOX.e;
     const ll = `lat_lon=${lat.toFixed(4)},${lon.toFixed(4)}`;
     const omBasis = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&timezone=auto&forecast_days=8`
-      + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunshine_duration";
+      + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunshine_duration,uv_index_max&current=uv_index";
     const omStd = omBasis + "&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,snowfall,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,sunshine_duration,shortwave_radiation,cape,freezing_level_height";
     const omUrl = imGebiet ? omBasis : omStd;
+    const messP = imGebiet ? messung(lat, lon).catch(() => null) : Promise.resolve(null), luftP = luft(lat, lon).catch(() => null);
     const [nwp, ens, nc, om] = await Promise.all([
       imGebiet ? hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=2t,tp,tcc,sy,10fg,10u,10v,2r,sund,sf,pt,snowlmt,msl,ssrd,cape`).catch(() => null) : null,
       imGebiet ? hole(`${GEO}/ensemble-v2-1h-1km?${ll}&parameters=tp_p10,tp_p50,tp_p90,2t_p10,2t_p90,10fg_p90`).catch(() => null) : null,
@@ -274,8 +326,12 @@ const Wetter = (() => {
     if (!stunden.length) throw new Error("Keine Wetterdaten erreichbar");
     const ort = await ortP;
     const d = baue(stunden, om?.daily || null, new Date(), ort, lat, lon, quellen, lauf, nc);
-    d.standortFrei = !!pos; d.standortFehler = pos ? null : st.fehler;
+    d.standortFrei = !!pos; d.standortFehler = pos ? null : st.fehler; d.gewaehlt = !!wahl;
+    d.messung = await messP; d.pollen = await luftP;
+    const uvJ = om?.current?.uv_index, uvM = om?.daily?.uv_index_max?.[0];
+    d.uv = uvM != null || uvJ != null ? { jetzt: uvJ != null ? Math.round(uvJ) : null, max: uvM != null ? Math.round(uvM) : null, text: uvText(uvM ?? uvJ) } : null;
+    if (d.messung) d.quellen = [...new Set(["GeoSphere Austria (CC BY 4.0)", ...d.quellen])];
     return d;
   }
-  return { laden, _test: { baue, stundenGeo, nowcast } };
+  return { laden, suche, _test: { baue, stundenGeo, nowcast } };
 })();

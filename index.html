@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" class="leer">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Wetter">
+<meta name="apple-mobile-web-app-title" content="GigioWetter">
 <meta name="theme-color" id="themecolor" content="#55636f">
-<title>Wetter</title>
+<title>GigioWetter</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
@@ -80,7 +80,7 @@ footer { text-align: center; }
 .astro .bogen text { font-family: var(--body); font-variant-numeric: tabular-nums; }
 .astro .mond { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 84px; padding-left: 12px; border-left: .5px solid var(--line); text-align: center; }
 .astro .mond svg { width: 22px; height: 22px; color: var(--soft); }
-.astro .mond b { font-size: 11.5px; font-weight: 500; line-height: 1.15; color: var(--soft); }
+.astro .mond b { font-size: 12.5px; font-weight: 500; line-height: 1.15; color: var(--soft); }
 .summary { display: flex; align-items: center; gap: 12px; }
 .summary .big { flex: 0 0 46px; height: 46px; }
 .summary .satz { margin: 0; font-size: 17px; font-weight: 500; line-height: 1.3; letter-spacing: -.01em; text-wrap: balance; }
@@ -95,8 +95,8 @@ footer { text-align: center; }
 .card h2 { margin: 0 0 3px; font-size: 12.5px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--soft); }
 .card .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 3px; }
 .card .head h2 { margin: 0; }
-.seg { display: inline-flex; padding: 2px; border-radius: 9px; background: var(--panel); border: .5px solid var(--line); }
-.seg button { font: inherit; font-size: 13px; font-weight: 500; color: var(--soft); background: transparent; border: 0; border-radius: 7px; padding: 4px 11px; min-height: 28px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.seg { display: inline-flex; padding: 2px; border-radius: 11px; background: var(--panel); border: .5px solid var(--line); }
+.seg button { font: inherit; font-size: 14px; font-weight: 500; color: var(--soft); background: transparent; border: 0; border-radius: 9px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
 .seg button[aria-pressed="true"] { color: var(--ink); font-weight: 600; background: var(--lift); box-shadow: inset 0 .5px 0 var(--glass-edge), 0 1px 3px rgba(0,0,0,.18); }
 .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .card .lead { font-family: var(--display); font-size: 19px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 8px; }
@@ -110,12 +110,12 @@ footer { text-align: center; }
 .hour.now .h { color: var(--ink); font-weight: 600; }
 .hour svg { width: 28px; height: 28px; }
 .hour .t { font-size: 17px; font-weight: 600; }
-.hour .r { font-size: 11.5px; color: var(--wet); min-height: 15px; font-weight: 500; }
+.hour .r { font-size: 12px; color: var(--wet); min-height: 15px; font-weight: 500; }
 .hour.newday { border-left: 1px solid var(--line); }
 .hour .h { white-space: nowrap; }
 
 svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
-.chart text { fill: var(--soft); font-family: var(--body); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.chart text { fill: var(--soft); font-family: var(--body); font-size: 12px; font-variant-numeric: tabular-nums; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--soft); margin-top: 6px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; background: var(--wet); }
 .legend i.maybe { opacity: .32; }
@@ -123,6 +123,7 @@ svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin-top: 8px; }
 .tile .k { font-size: 12.5px; color: var(--soft); }
 .tile .v { font-family: var(--display); font-size: 22px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.tile .v .klein { font-size: 16px; line-height: 1.25; display: inline-block; padding-top: 3px; }
 .tile .v small { font-family: var(--body); font-size: 13px; font-weight: 400; color: var(--soft); }
 
 .card h3 { margin: 14px 0 0; font-size: 12.5px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--soft); }
@@ -224,20 +225,58 @@ html.cat-on .feedbtn { display: grid; }
 #ptr.bereit svg { transform: scale(1.12); }
 #ptr.laeuft svg { animation: ptrdreh .75s linear infinite; }
 @keyframes ptrdreh { to { transform: rotate(360deg); } }
+/* Ladebildschirm */
+#splash { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; text-align: center; background: linear-gradient(180deg, #16263a, #2c4a6b); color: #fff; transition: opacity .45s ease; }
+#splash.weg { opacity: 0; pointer-events: none; }
+#splash img { width: 112px; height: 112px; border-radius: 26px; box-shadow: 0 14px 40px rgba(0,0,0,.35); }
+#splash h1 { font-family: var(--display); font-size: 30px; font-weight: 700; letter-spacing: -.02em; margin: 18px 0 6px; }
+#splash p { font-size: 15px; color: rgba(255,255,255,.75); margin: 0; min-height: 22px; }
+#splash .ring { width: 26px; height: 26px; margin: 22px auto 0; border-radius: 50%; border: 2.5px solid rgba(255,255,255,.25); border-top-color: #fff; animation: ptrdreh .8s linear infinite; }
+#splash.fehler .ring { display: none; }
+#splash button { display: none; margin-top: 20px; font: inherit; font-size: 16px; font-weight: 600; color: #16263a; background: #fff; border: 0; border-radius: 14px; padding: 12px 22px; min-height: 44px; }
+#splash.fehler button { display: inline-block; }
+html.leer main { visibility: hidden; }
+/* Ortswahl */
+.loc { background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 10px 14px; margin: -10px auto; display: block; min-height: 44px; -webkit-tap-highlight-color: transparent; }
+.loc::after { content: " ▾"; opacity: .7; }
+.mess { font-size: 12.5px; color: var(--soft); margin-top: 6px; }
+#orte { position: fixed; inset: 0; z-index: 70; background: rgba(4,10,18,.55); display: flex; align-items: flex-end; justify-content: center; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+#orte[hidden] { display: none; }
+#orte .blatt { width: 100%; max-width: 460px; max-height: 86vh; overflow-y: auto; background: #18273a; color: #fff; border-radius: 26px 26px 0 0; padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 18px); box-shadow: 0 -10px 40px rgba(0,0,0,.4); }
+#orte h2 { font-size: 20px; font-weight: 700; margin: 0 0 12px; color: #fff; text-transform: none; letter-spacing: 0; }
+#orte .zeile { display: flex; align-items: center; gap: 8px; border-top: .5px solid rgba(255,255,255,.14); }
+#orte .zeile button { font: inherit; color: #fff; background: none; border: 0; text-align: left; min-height: 50px; padding: 8px 2px; cursor: pointer; }
+#orte .zeile .w { flex: 1; font-size: 16.5px; font-weight: 500; }
+#orte .zeile .w small { display: block; font-size: 13px; font-weight: 400; color: rgba(255,255,255,.62); }
+#orte .zeile .w.aktiv { color: #9fdcff; font-weight: 700; }
+#orte .zeile .x { width: 44px; text-align: center; font-size: 15px; color: rgba(255,255,255,.6); }
+#orte .zeile .merk { font-size: 14px; color: #9fdcff; padding: 8px 10px; white-space: nowrap; }
+#orte input { width: 100%; font: inherit; font-size: 17px; color: #fff; background: rgba(255,255,255,.1); border: .5px solid rgba(255,255,255,.2); border-radius: 13px; padding: 12px 14px; margin: 14px 0 6px; min-height: 48px; }
+#orte input::placeholder { color: rgba(255,255,255,.5); }
+#orte .info { font-size: 13.5px; color: rgba(255,255,255,.62); padding: 8px 2px; }
+#orte .zu { width: 100%; margin-top: 12px; font: inherit; font-size: 16.5px; font-weight: 600; color: #fff; background: rgba(255,255,255,.14); border: 0; border-radius: 14px; min-height: 48px; }
+.pollen { margin: 14px 0 0; padding-top: 12px; border-top: .5px solid var(--line); font-size: 14.5px; }
+.pollen b { font-weight: 600; }
+.messkopf { font-size: 12.5px; color: var(--soft); margin: 2px 0 2px; }
 </style>
 </head>
 <body>
 <div class="sky"></div>
 <canvas id="fx" aria-hidden="true"></canvas>
+<div id="splash"><div><img src="icon-180.png" alt=""><h1>GigioWetter</h1><p id="splashText">Wetter wird geladen …</p><div class="ring"></div><button type="button" id="splashBtn">Noch einmal versuchen</button></div></div>
+<div id="orte" hidden><div class="blatt" role="dialog" aria-modal="true" aria-label="Ort wählen"><h2>Ort wählen</h2><div id="orteListe"></div>
+  <input type="search" id="ortSuche" placeholder="Ort oder Postleitzahl suchen" autocomplete="off" autocorrect="off" enterkeyhint="search" aria-label="Ort suchen"><div id="ortTreffer"></div>
+  <button type="button" class="zu" id="orteZu">Schließen</button></div></div>
 <div id="ptr" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M20.4 3.2v5.6h-5.6z" fill="#fff"/></svg></div>
 <main>
   <section class="hero" aria-label="Aktuelles Wetter">
     <button type="button" class="feedbtn" id="feedbtn" aria-label="Gigio füttern"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12.5h17l-1.6 5.2a2 2 0 0 1-1.9 1.4H7a2 2 0 0 1-1.9-1.4z"/><circle cx="9" cy="10.4" r="1.2" fill="currentColor" stroke="none"/><circle cx="12.4" cy="9.6" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.6" cy="10.6" r="1.2" fill="currentColor" stroke="none"/></svg></button>
-    <div class="loc" id="loc"></div>
+    <button type="button" class="loc" id="loc" aria-label="Ort wählen"></button>
     <div class="stale" id="stale" hidden></div>
     <div class="temp" id="temp"></div>
     <div class="cond" id="cond"></div>
     <div class="range" id="range"></div>
+    <div class="mess" id="mess"></div>
   </section>
   <section class="card summary" aria-label="Zusammenfassung"><div class="big" id="icon"></div><p class="satz" id="satz"></p></section>
   <div id="cards"></div>
@@ -246,8 +285,8 @@ html.cat-on .feedbtn { display: grid; }
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611161116"></script>
-<script src="gigio.js?v=202611161116"></script>
+<script src="daten.js?v=202611161611"></script>
+<script src="gigio.js?v=202611161611"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -409,27 +448,33 @@ function cardWind(d) {
 
 const RICHT = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
 function cardDetails(d) {
-  const j = d.jetzt, h = d.heute, na = v => v == null ? "?" : v;
+  const j = d.jetzt, h = d.heute, m = d.messung, na = v => v == null ? "?" : v;
   const tile = (k, v, s = "") => `<div class="tile"><div class="k">${k}</div><div class="v">${v} <small>${s}</small></div></div>`;
-  const cape = j.cape == null ? "?" : j.cape < 100 ? "keine" : j.cape < 500 ? "gering" : j.cape < 1500 ? "mäßig" : "hoch";
-  return `<section class="card"><h2>Heute im Detail</h2><div class="tiles">
-    ${tile("Tiefst und Höchstwert", grad(h.min) + " / " + grad(h.max))}
-    ${tile("Temperatur möglich", j.temp_p10 != null ? grad(j.temp_p10) + " bis " + grad(j.temp_p90) : "?")}
-    ${tile("Gefühlt", grad(j.gefuehlt))}
-    ${tile("Taupunkt", grad(j.taupunkt))}
-    ${tile("Bewölkung", j.wolken, "%")}
-    ${tile("Luftfeuchte", j.feuchte, "%")}
-    ${tile("Wind", j.wind, "km/h aus " + RICHT[Math.round(j.richtung / 45) % 8])}
-    ${tile("Böen jetzt", j.boe, "km/h" + (j.boe_p90 != null ? ", möglich " + j.boe_p90 : ""))}
-    ${tile("Böen bis Mitternacht", h.boe_max, "km/h")}
-    ${tile("Luftdruck", j.druck != null ? Math.round(j.druck) : "?", "hPa" + (h.drucktrend ? ", " + h.drucktrend : ""))}
-    ${tile("Sonnenschein heute", de(h.sonne_h), "Stunden")}
-    ${tile("Sonnenstrahlung", na(j.strahlung), "W/m²")}
-    ${tile("Regen bis Mitternacht", de(h.regen_rest), "mm")}
-    ${tile("Regenrisiko jetzt", j.risiko || "?")}
-    ${tile("Schneefallgrenze", na(j.schneefallgrenze), "m")}
-    ${tile("Gewitterneigung", cape, j.cape != null ? "CAPE " + j.cape : "")}
-  </div></section>`;
+  const cape = j.cape == null ? null : j.cape < 100 ? "nicht zu erwarten" : j.cape < 500 ? "wenig wahrscheinlich" : j.cape < 1500 ? "möglich" : "wahrscheinlich";
+  const REGEN = { trocken: "unwahrscheinlich", "möglich": "möglich", wahrscheinlich: "wahrscheinlich", sicher: "sehr wahrscheinlich" };
+  const ri = v => RICHT[Math.round(v / 45) % 8];
+  const t = [];
+  t.push(tile("Tiefst und Höchstwert", grad(h.min) + " / " + grad(h.max)));
+  t.push(tile("Gefühlt", grad(j.gefuehlt)));
+  if (m && m.wind != null) t.push(tile("Wind gemessen", m.wind, "km/h" + (m.richtung != null && m.wind > 2 ? " aus " + ri(m.richtung) : "")));
+  else t.push(tile("Wind", j.wind, "km/h aus " + ri(j.richtung)));
+  t.push(tile(m && m.boe != null ? "Böen gemessen" : "Böen jetzt", m && m.boe != null ? m.boe : j.boe, "km/h"));
+  t.push(tile("Böen bis Mitternacht", h.boe_max, "km/h"));
+  t.push(tile("Luftfeuchte", m && m.feuchte != null ? m.feuchte : j.feuchte, "%"));
+  t.push(tile("Taupunkt", grad(m && m.taupunkt != null ? m.taupunkt : j.taupunkt)));
+  t.push(tile("Bewölkung", j.wolken, "%"));
+  const druck = m && m.druck != null ? m.druck : j.druck;
+  t.push(tile("Luftdruck", druck != null ? Math.round(druck) : "?", "hPa" + (h.drucktrend ? ", " + h.drucktrend : "")));
+  t.push(tile("Regen bis Mitternacht", de(h.regen_rest), "mm"));
+  if (j.risiko) t.push(tile("Regen in dieser Stunde", `<span class="klein">${REGEN[j.risiko] || j.risiko}</span>`));
+  t.push(tile("Sonnenschein heute", de(h.sonne_h), "Stunden"));
+  if (d.uv) t.push(tile("UV-Index heute", d.uv.max ?? d.uv.jetzt, d.uv.text + (d.uv.jetzt != null && d.uv.max != null && !d.nacht ? ", jetzt " + d.uv.jetzt : "")));
+  if (!d.nacht && j.strahlung != null) t.push(tile("Sonnenstrahlung", j.strahlung, "W/m²"));
+  if (j.schneefallgrenze != null && j.schneefallgrenze < 1200) t.push(tile("Schneefallgrenze", j.schneefallgrenze, "m"));
+  if (cape && j.cape >= 100) t.push(tile("Gewitter", `<span class="klein">${cape}</span>`));
+  const kopf = m ? `<p class="messkopf">Messwerte von ${m.station}, ${de(m.km)} km entfernt, ${m.zeit.slice(11, 16)} Uhr</p>` : "";
+  const pollen = d.pollen && d.pollen.length ? `<p class="pollen">Pollen heute: ${d.pollen.map(p => `<b>${p.name}</b> ${p.stufe}`).join(", ")}</p>` : "";
+  return `<section class="card"><h2>Heute im Detail</h2>${kopf}<div class="tiles">${t.join("")}</div>${pollen}</section>`;
 }
 
 // Farbton je Wetterlage fuer die Wochenzeilen: [R,G,B], Deckkraft
@@ -492,7 +537,7 @@ function render() {
   $("stand").textContent = "Stand " + datum;
   zeigeAlter();
   const GRUND = { 0: "Dieser Browser gibt keinen Standort heraus.", 1: "Der Standort wurde nicht freigegeben.", 2: "Der Standort ist gerade nicht verfügbar.", 3: "Die Standortabfrage hat zu lange gedauert." };
-  $("standortHilfe").innerHTML = d.standortFrei ? "" : `<button type="button" class="standort" id="standortBtn">Meinen Standort verwenden</button>
+  $("standortHilfe").innerHTML = d.standortFrei || d.gewaehlt ? "" : `<button type="button" class="standort" id="standortBtn">Meinen Standort verwenden</button>
     <p class="hinweis">${GRUND[d.standortFehler] ?? GRUND[1]} Gezeigt wird 1010 Wien.${d.standortFehler === 1 ? " Am iPhone unter Settings > Privacy & Security > Location Services > Safari Websites auf \"While Using the App\" stellen." : ""}</p>`;
   const sb = $("standortBtn"); if (sb) sb.onclick = () => {
     sb.disabled = true; sb.textContent = "Standort wird abgefragt …";
@@ -501,11 +546,14 @@ function render() {
   const veraltet = !DEMO && alt > 45;
   $("stale").hidden = !veraltet;
   $("stale").textContent = veraltet ? `Daten nicht aktuell, Stand ${d.stand.slice(11, 16)} Uhr` : "";
-  $("temp").innerHTML = `${Math.round(d.jetzt.temp)}<sup id="deg">°</sup>`;
+  const mess = d.messung && Date.now() - new Date(d.messung.zeit).getTime() < 60 * 60000 ? d.messung : null;
+  $("temp").innerHTML = `${Math.round(mess ? mess.temp : d.jetzt.temp)}<sup id="deg">°</sup>`;
+  $("mess").textContent = mess ? `Gemessen um ${mess.zeit.slice(11, 16)} Uhr, ${mess.station}` : "";
+  document.documentElement.classList.remove("leer"); $("splash").classList.add("weg");
   const naechste = d.stunden.slice(0, 12), nass = naechste.find(s => s.regen >= 0.1);
   $("icon").innerHTML = icon(nass ? nass.symbol : d.jetzt.symbol, nass ? nass.nacht : d.nacht);
   $("cond").innerHTML = `${icon(d.jetzt.symbol, d.nacht)}${d.jetzt.text}`;
-  $("range").innerHTML = `H: ${grad(d.heute.max)} &nbsp;T: ${grad(d.heute.min)} <span>&nbsp;· gefühlt ${grad(d.jetzt.gefuehlt)}</span>`;
+  $("range").innerHTML = `H: ${grad(mess ? Math.max(d.heute.max, mess.temp) : d.heute.max)} &nbsp;T: ${grad(mess ? Math.min(d.heute.min, mess.temp) : d.heute.min)} <span>&nbsp;· gefühlt ${grad(d.jetzt.gefuehlt)}</span>`;
   $("themecolor").content = getComputedStyle(document.documentElement).getPropertyValue("--sky-a").trim();
   const m = mond(new Date(d.stand));
   const mi = t => +t.slice(0, 2) * 60 + +t.slice(3, 5);
@@ -519,12 +567,12 @@ function render() {
       <line x1="10" x2="210" y1="26" y2="26" stroke="var(--line)" stroke-width="1"/>${punkt}
       <text x="34" y="40" text-anchor="middle" font-size="12" font-weight="500" fill="var(--ink)">${d.heute.sonnenaufgang}</text>
       <text x="186" y="40" text-anchor="middle" font-size="12" font-weight="500" fill="var(--ink)">${d.heute.sonnenuntergang}</text>
-      <text x="110" y="40" text-anchor="middle" font-size="10.5" fill="var(--soft)">${Math.floor(dauer / 60)} h ${dauer % 60} min Tag</text></svg>
+      <text x="110" y="40" text-anchor="middle" font-size="11.5" fill="var(--soft)">${Math.floor(dauer / 60)} h ${dauer % 60} min Tag</text></svg>
     <div class="mond">${m.svg}<b>${m.name}</b></div></section>`;
   $("satz").textContent = d.heute.satz;
   const cards = { astro: () => astroHTML, stunden: cardStunden, regen: cardRegen, wind: cardWind, details: cardDetails, woche: cardWoche };
   $("cards").innerHTML = orderFor(ch).map(k => cards[k](d)).join("") + (DEMO ? cardEntwurf() : "");
-  $("fuss").innerHTML = `Daten: ${d.quellen.join(", ")}${d.standortFrei ? ", Ortsname © OpenStreetMap" : ""}.` + (d.modelllauf ? ` Modelllauf ${new Date(d.modelllauf).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })} Uhr.` : "");
+  $("fuss").innerHTML = `Daten: ${d.quellen.join(", ")}${d.standortFrei || d.gewaehlt ? ", Ortsname © OpenStreetMap" : ""}.` + (d.modelllauf ? ` Modelllauf ${new Date(d.modelllauf).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })} Uhr.` : "");
   const wl = nacht ? "nacht" : ["sonnig", "heiter", "hitze", "frost"].includes(ch) ? "sonne" : ch === "sturm" ? "wind" : "regen";
   Gigio.setWeather(wl);
   document.querySelectorAll("[data-rv]").forEach(b => b.onclick = () => { regenView = b.dataset.rv; render(); });
@@ -545,18 +593,58 @@ function zeigeAlter() {
   $("loc").textContent = `${DATA.ort} · ${alter}`;
 }
 setInterval(zeigeAlter, 30000);
+const lese = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
+const schreibe = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+let ORTWAHL = lese("ortwahl", null), ORTE = lese("orte", []);
 async function load() {
   if (laedt) return; laedt = true;
+  const wahl = ORTWAHL;
   try {
-    DATA = await Wetter.laden(); zuletzt = Date.now();
-    try { localStorage.setItem("letzte", JSON.stringify(DATA)); } catch (e) {}
+    const neu = await Wetter.laden(wahl);
+    if (wahl === ORTWAHL) { DATA = neu; zuletzt = Date.now(); schreibe("letzte", DATA); }
   } catch (e) {
-    if (!DATA) { try { DATA = JSON.parse(localStorage.getItem("letzte")); } catch (e2) {} }
+    if (!DATA) DATA = lese("letzte", null);
   }
   laedt = false;
-  if (!DATA) { $("satz").textContent = "Keine Wetterdaten erreichbar. Bitte später noch einmal versuchen."; return; }
+  if (wahl !== ORTWAHL) return load();                 // Ort wurde inzwischen gewechselt
+  if (!DATA) { $("splash").classList.add("fehler"); $("splashText").textContent = "Keine Wetterdaten erreichbar."; return; }
   render();
 }
+$("splashBtn").onclick = () => { $("splash").classList.remove("fehler"); $("splashText").textContent = "Wetter wird geladen …"; load(); };
+
+/* ---------- Ort wählen ---------- */
+const gleich = (a, b) => a && b && Math.abs(a.lat - b.lat) < .002 && Math.abs(a.lon - b.lon) < .002;
+function orteZeichnen() {
+  const z = (o, i) => `<div class="zeile"><button type="button" class="w${gleich(o, ORTWAHL) ? " aktiv" : ""}" data-i="${i}">${o.name}${o.zusatz ? `<small>${o.zusatz}</small>` : ""}</button><button type="button" class="x" data-weg="${i}" aria-label="${o.name} entfernen">✕</button></div>`;
+  $("orteListe").innerHTML = `<div class="zeile"><button type="button" class="w${ORTWAHL ? "" : " aktiv"}" data-i="gps">Aktueller Standort<small>folgt dem iPhone</small></button></div>` + ORTE.map(z).join("");
+}
+function waehle(o) {
+  ORTWAHL = o; schreibe("ortwahl", o); $("orte").hidden = true; document.body.style.overflow = "";
+  $("loc").textContent = (o ? o.name : "Standort") + " · wird geladen …"; zuletzt = 0; load();
+}
+let TREFFER = [], suchT = 0, suchNr = 0;
+async function sucheOrt() {
+  const q = $("ortSuche").value.trim(), nr = ++suchNr;
+  if (q.length < 2) { $("ortTreffer").innerHTML = ""; return; }
+  $("ortTreffer").innerHTML = `<div class="info">Suche …</div>`;
+  let r = []; try { r = await Wetter.suche(q); } catch (e) { if (nr === suchNr) $("ortTreffer").innerHTML = `<div class="info">Die Suche ist gerade nicht erreichbar.</div>`; return; }
+  if (nr !== suchNr) return; TREFFER = r;
+  $("ortTreffer").innerHTML = r.length ? r.map((o, i) => `<div class="zeile"><button type="button" class="w" data-t="${i}">${o.name}${o.zusatz ? `<small>${o.zusatz}</small>` : ""}</button><button type="button" class="merk" data-m="${i}">Merken</button></div>`).join("") : `<div class="info">Nichts gefunden.</div>`;
+}
+$("loc").onclick = () => { orteZeichnen(); $("ortSuche").value = ""; $("ortTreffer").innerHTML = ""; $("orte").hidden = false; document.body.style.overflow = "hidden"; };
+$("orteZu").onclick = () => { $("orte").hidden = true; document.body.style.overflow = ""; };
+$("orte").onclick = e => {
+  if (e.target === $("orte")) return $("orteZu").onclick();
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.i === "gps") return waehle(null);
+  if (b.dataset.i != null) return waehle(ORTE[+b.dataset.i]);
+  if (b.dataset.weg != null) { const o = ORTE.splice(+b.dataset.weg, 1)[0]; schreibe("orte", ORTE); if (gleich(o, ORTWAHL)) return waehle(null); return orteZeichnen(); }
+  const merken = o => { if (!ORTE.some(x => gleich(x, o))) { ORTE.push(o); ORTE = ORTE.slice(-6); schreibe("orte", ORTE); } };
+  if (b.dataset.m != null) { merken(TREFFER[+b.dataset.m]); return waehle(TREFFER[+b.dataset.m]); }
+  if (b.dataset.t != null) return waehle(TREFFER[+b.dataset.t]);
+};
+$("ortSuche").oninput = () => { clearTimeout(suchT); suchT = setTimeout(sucheOrt, 700); };
+$("ortSuche").onkeydown = e => { if (e.key === "Enter") { clearTimeout(suchT); sucheOrt(); $("ortSuche").blur(); } };
 
 /* ---------- Himmel Animation (Canvas) ---------- */
 const cv = $("fx"), cx = cv.getContext("2d");
@@ -615,7 +703,7 @@ setInterval(load, 10 * 60 * 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - zuletzt > 5 * 60 * 1000) load(); });
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611161116";
+const VERSION = "202611161611";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
@@ -624,6 +712,7 @@ async function pruefeVersion() {
 }
 pruefeVersion();
 document.addEventListener("visibilitychange", () => { if (!document.hidden) pruefeVersion(); });
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});   // damit die App auch ohne Netz startet
 
 /* ---------- Zum Aktualisieren nach unten ziehen ----------
    Die Seite selbst wird nicht angefasst: iOS federt sie von allein, hier wird nur gemessen und der kleine Kreis bewegt. */

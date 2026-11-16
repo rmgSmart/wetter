@@ -1,4 +1,4 @@
-# Wetter
+# GigioWetter
 
 Eine kleine Wetterseite fürs iPhone, gedacht als Web App am Home Bildschirm.
 

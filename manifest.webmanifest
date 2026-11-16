@@ -1,6 +1,6 @@
 {
-  "name": "Wetter",
-  "short_name": "Wetter",
+  "name": "GigioWetter",
+  "short_name": "GigioWetter",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
