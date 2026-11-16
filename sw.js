@@ -1,7 +1,7 @@
 // GigioWetter: haelt die App selbst im Zwischenspeicher, damit sie auch ohne Netz startet.
 // Seiten und Skripte kommen immer zuerst aus dem Netz, der Speicher ist nur der Notnagel.
 const C = "gigiowetter-1";
-self.addEventListener("install", e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => c.addAll(["./", "daten.js", "gigio.js", "manifest.webmanifest", "icon-180.png"]).catch(() => {}))); });
+self.addEventListener("install", e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => c.addAll(["./", "daten.js", "gigio.js", "manifest.webmanifest", "icon-180.png", "fell.jpg"]).catch(() => {}))); });
 self.addEventListener("activate", e => e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n !== C).map(n => caches.delete(n)))).then(() => self.clients.claim())));
 self.addEventListener("fetch", e => {
   const u = new URL(e.request.url);
