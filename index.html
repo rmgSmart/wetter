@@ -246,8 +246,8 @@ html.cat-on .feedbtn { display: grid; }
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611131938"></script>
-<script src="gigio.js?v=202611131938"></script>
+<script src="daten.js?v=202611160816"></script>
+<script src="gigio.js?v=202611160816"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -333,7 +333,7 @@ function hourCol(s, label, cls = "") {
   return `<div class="hour${cls}" style="--tint:${tint};--ta:${ta}"><span class="h">${label}</span>${icon(s.symbol, s.nacht)}<span class="t">${grad(s.temp)}</span><span class="r">${s.regen >= 0.1 ? de(s.regen) + " mm" : ""}</span></div>`;
 }
 function cardStunden(d) {
-  const st = d.stunden.slice(0, 25);
+  const st = d.stunden.slice(0, 25); if (!st.length) return "";
   let prev = st[0].zeit.slice(0, 10);
   const cols = st.map((s, i) => {
     const neu = s.zeit.slice(0, 10) !== prev; prev = s.zeit.slice(0, 10);
@@ -615,7 +615,7 @@ setInterval(load, 10 * 60 * 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - zuletzt > 5 * 60 * 1000) load(); });
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611131938";
+const VERSION = "202611160816";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();

@@ -79,6 +79,45 @@ const Gigio = (() => {
     lauf4: { w: 234, h: 165, ax: 0.501, ay: 1, hx: 0.915, hy: .3, face: 1, k: 0.9 },
     lauf5: { w: 222, h: 155, ax: 0.474, ay: 1, hx: 0.910, hy: .3, face: 1, k: 0.9 },
     lauf6: { w: 216, h: 180, ax: 0.460, ay: 1, hx: 0.907, hy: .3, face: 1, k: 0.9 },
+    sl1: { w: 98, h: 106, ax: 0.541, ay: 1, hx: .8, hy: .08, face: 1, k: 1.8 },
+    sl2: { w: 131, h: 103, ax: 0.656, ay: 1, hx: .8, hy: .08, face: 1, k: 1.8 },
+    sl3: { w: 142, h: 77, ax: 0.683, ay: 1, hx: .8, hy: .08, face: 1, k: 1.8 },
+    sl4: { w: 144, h: 73, ax: 0.688, ay: 1, hx: .8, hy: .08, face: 1, k: 1.8 },
+    sl5: { w: 151, h: 67, ax: 0.702, ay: 1, hx: .8, hy: .08, face: 1, k: 1.8 },
+    sl6: { w: 145, h: 71, ax: 0.690, ay: 1, hx: .8, hy: .08, face: 1, k: 1.8 },
+    sl7: { w: 160, h: 60, ax: 0.719, ay: 1, hx: .8, hy: .08, face: 1, k: 1.8 },
+    sl8: { w: 156, h: 57, ax: 0.712, ay: 1, hx: .8, hy: .08, face: 1, k: 1.8 },
+    sl9: { w: 154, h: 55, ax: 0.708, ay: 1, hx: .8, hy: .08, face: 1, k: 1.8 },
+    pu1: { w: 80, h: 94, ax: 0.500, ay: 1, hx: .8, hy: .08, face: 1, k: 2.0 },
+    pu2: { w: 87, h: 89, ax: 0.540, ay: 1, hx: .8, hy: .08, face: 1, k: 2.0 },
+    pu3: { w: 86, h: 89, ax: 0.535, ay: 1, hx: .8, hy: .08, face: 1, k: 2.0 },
+    pu4: { w: 82, h: 88, ax: 0.512, ay: 1, hx: .8, hy: .08, face: 1, k: 2.0 },
+    pu5: { w: 100, h: 88, ax: 0.600, ay: 1, hx: .8, hy: .08, face: 1, k: 2.0 },
+    pu6: { w: 99, h: 88, ax: 0.596, ay: 1, hx: .8, hy: .08, face: 1, k: 2.0 },
+    pu7: { w: 95, h: 83, ax: 0.579, ay: 1, hx: .8, hy: .08, face: 1, k: 2.0 },
+    pu8: { w: 99, h: 82, ax: 0.596, ay: 1, hx: .8, hy: .08, face: 1, k: 2.0 },
+    pu9: { w: 108, h: 77, ax: 0.630, ay: 1, hx: .8, hy: .08, face: 1, k: 2.0 },
+    gw1: { w: 77, h: 89, ax: 0.481, ay: 1, hx: .8, hy: .08, face: 1, k: 2.0 },
+    gw2: { w: 106, h: 86, ax: 0.623, ay: 1, hx: .8, hy: .08, face: 1, k: 2.0 },
+    gw3: { w: 90, h: 85, ax: 0.556, ay: 1, hx: .8, hy: .08, face: 1, k: 2.0 },
+    pf1: { w: 127, h: 69, ax: 0.611, ay: 1, hx: .8, hy: .08, face: 1, k: 1.6 },
+    pf2: { w: 129, h: 69, ax: 0.603, ay: 1, hx: .8, hy: .08, face: 1, k: 1.6 },
+    pf3: { w: 124, h: 68, ax: 0.590, ay: 1, hx: .8, hy: .08, face: 1, k: 1.6 },
+    pf4: { w: 143, h: 66, ax: 0.552, ay: 1, hx: .8, hy: .08, face: 1, k: 1.6 },
+    pf5: { w: 145, h: 66, ax: 0.569, ay: 1, hx: .8, hy: .08, face: 1, k: 1.6 },
+    pf6: { w: 132, h: 68, ax: 0.612, ay: 1, hx: .8, hy: .08, face: 1, k: 1.6 },
+    pf7: { w: 141, h: 68, ax: 0.602, ay: 1, hx: .8, hy: .08, face: 1, k: 1.6 },
+    pf8: { w: 141, h: 69, ax: 0.594, ay: 1, hx: .8, hy: .08, face: 1, k: 1.6 },
+    pf9: { w: 138, h: 67, ax: 0.589, ay: 1, hx: .8, hy: .08, face: 1, k: 1.6 },
+    sw1: { w: 94, h: 87, ax: 0.766, ay: 1, hx: .8, hy: .08, face: 1, k: 2.15 },
+    sw2: { w: 70, h: 85, ax: 0.686, ay: 1, hx: .8, hy: .08, face: 1, k: 2.15 },
+    sw3: { w: 95, h: 87, ax: 0.768, ay: 1, hx: .8, hy: .08, face: 1, k: 2.15 },
+    sw4: { w: 82, h: 85, ax: 0.732, ay: 1, hx: .8, hy: .08, face: 1, k: 2.15 },
+    sw5: { w: 86, h: 85, ax: 0.744, ay: 1, hx: .8, hy: .08, face: 1, k: 2.15 },
+    sw6: { w: 88, h: 83, ax: 0.750, ay: 1, hx: .8, hy: .08, face: 1, k: 2.15 },
+    sw7: { w: 94, h: 82, ax: 0.766, ay: 1, hx: .8, hy: .08, face: 1, k: 2.15 },
+    sw8: { w: 97, h: 81, ax: 0.773, ay: 1, hx: .8, hy: .08, face: 1, k: 2.15 },
+    sw9: { w: 102, h: 84, ax: 0.784, ay: 1, hx: .8, hy: .08, face: 1, k: 2.15 },
     seitsitz:  { w: 208, h: 207, ax: .5, ay: 1, hx: .8,  hy: .03, face: 1, k: .8 },
     sitz_a:    { w: 156, h: 189, ax: .5, ay: 1, hx: .55, hy: .05, face: 1 },
     sitz_b:    { w: 193, h: 190, ax: .5, ay: 1, hx: .72, hy: .03, face: 1 },
@@ -158,7 +197,7 @@ const Gigio = (() => {
     if (art === "steh" && LIEGT.has(v)) l = reihe("au", 1, 8, .075);
     if (art === "lieg") {
       if (GANG.test(v)) l = reihe("hl", 1, 8, .08);
-      else if (!LIEGT.has(v)) l = [["sitz_b", .2]].concat(reihe("hl", 2, 8, .08));
+      else if (!LIEGT.has(v)) l = reihe("sl", 1, 9, .08);
       else if (v !== "liegen_vorne" && n !== "liegen_vorne") l = [["liegen_vorne", .3]];
     }
     cat.t -= folge(l.concat(extra), n);
@@ -209,14 +248,14 @@ const Gigio = (() => {
 
   /* ---------- Verhalten ---------- */
   const GEWICHT = {
-    regen: { sit: 1.4, streng: 1, walk: 4.5, spazier: 2.2, jump: 2, talk: 1.2, angelehnt: .8, sphinx: 1, seite: .5, ruecken: .5, kante: .8, gaehnen: .6, putzen: 1.2, rollen: 1.4, hoch: 1.6, jagd: 1.6, zoomies: .9, ausreissen: .6, starren: .6, betteln: .5, knock: .6, turn: 1, strecken: 1.2 },
-    sonne: { sit: 1.2, streng: .8, walk: 4.5, spazier: 2.4, jump: 2.4, talk: 1, angelehnt: 1, sphinx: 1.2, seite: 1, ruecken: 1.2, kante: 1, gaehnen: .6, putzen: .9, rollen: 2.2, hoch: 1.6, jagd: 2.2, zoomies: 1.2, ausreissen: .8, starren: .6, betteln: .5, knock: .7, turn: 1, strecken: 1.2 },
-    nacht: { sit: .8, streng: .6, walk: 1.6, spazier: .8, jump: .6, talk: .4, angelehnt: 1.6, sphinx: 1.2, seite: 2.6, ruecken: 2.8, kante: 2, gaehnen: 1.2, putzen: .6, rollen: .5, hoch: .6, jagd: .6, zoomies: .5, ausreissen: .3, starren: .8, betteln: .3, knock: .2, turn: .4, strecken: 1.2 },
-    wind:  { sit: 1.8, streng: 1.2, walk: 3.5, spazier: 1.6, jump: 1.2, talk: 1.4, angelehnt: .8, sphinx: 1.2, seite: .5, ruecken: .4, kante: .6, gaehnen: .5, putzen: 1, rollen: .9, hoch: 2, jagd: 1.8, zoomies: .7, ausreissen: .5, starren: .6, betteln: .4, knock: .6, turn: 1.4, strecken: 1.2 },
+    regen: { sit: 1.4, streng: 1, walk: 4.5, spazier: 2.2, jump: 2, talk: 1.2, angelehnt: .8, sphinx: 1, seite: .5, ruecken: .5, kante: .8, gaehnen: .6, putzen: 1.2, rollen: 1.4, hoch: 1.6, jagd: 1.6, zoomies: .9, ausreissen: .6, starren: .6, betteln: .5, knock: .6, turn: 1, strecken: 1.2, pfote: 1, schwanz: 1.8 },
+    sonne: { sit: 1.2, streng: .8, walk: 4.5, spazier: 2.4, jump: 2.4, talk: 1, angelehnt: 1, sphinx: 1.2, seite: 1, ruecken: 1.2, kante: 1, gaehnen: .6, putzen: .9, rollen: 2.2, hoch: 1.6, jagd: 2.2, zoomies: 1.2, ausreissen: .8, starren: .6, betteln: .5, knock: .7, turn: 1, strecken: 1.2, pfote: 1, schwanz: 1.8 },
+    nacht: { sit: .8, streng: .6, walk: 1.6, spazier: .8, jump: .6, talk: .4, angelehnt: 1.6, sphinx: 1.2, seite: 2.6, ruecken: 2.8, kante: 2, gaehnen: 1.2, putzen: .6, rollen: .5, hoch: .6, jagd: .6, zoomies: .5, ausreissen: .3, starren: .8, betteln: .3, knock: .2, turn: .4, strecken: 1.2, pfote: 1, schwanz: 1.8 },
+    wind:  { sit: 1.8, streng: 1.2, walk: 3.5, spazier: 1.6, jump: 1.2, talk: 1.4, angelehnt: .8, sphinx: 1.2, seite: .5, ruecken: .4, kante: .6, gaehnen: .5, putzen: 1, rollen: .9, hoch: 2, jagd: 1.8, zoomies: .7, ausreissen: .5, starren: .6, betteln: .4, knock: .6, turn: 1.4, strecken: 1.2, pfote: 1, schwanz: 1.8 },
   };
   function waehle() {
     const w = { ...GEWICHT[weather] };
-    if (still) for (const k of ["walk", "spazier", "jump", "knock", "rollen", "hoch", "jagd", "zoomies", "ausreissen", "strecken"]) w[k] = 0;
+    if (still) for (const k of ["walk", "spazier", "jump", "knock", "rollen", "hoch", "jagd", "zoomies", "ausreissen", "strecken", "pfote"]) w[k] = 0;
     if (cat.act && w[cat.act]) w[cat.act] *= .25;
     let sum = 0; for (const k in w) sum += w[k];
     let r = Math.random() * sum; for (const k in w) { r -= w[k]; if (r <= 0) return k; }
@@ -251,7 +290,7 @@ const Gigio = (() => {
       case "ruecken": zeige("ruecken", "lieg"); cat.dur = weather === "nacht" ? lang(10, 18) : lang(4, 8); cat.zzT = 1; break;
       case "kante": zeige("kante", "lieg"); cat.dur = weather === "nacht" ? lang(8, 14) : lang(4, 8); cat.zzT = 2.5; break;
       case "gaehnen": zeige("gaehnen", "sitz"); cat.dur = 1.8; if (Math.random() < .4) sag("Gähn.", 1200); break;
-      case "putzen": zeige("putzen", "sitz"); cat.dur = lang(3, 5.5); break;
+      case "putzen": zeige("gw1", "sitz", reihe("pu", 1, 9, .1).concat(reihe("pu", 8, 6, .11), reihe("pu", 7, 9, .11), reihe("pu", 8, 6, .11), reihe("pu", 7, 9, .11), reihe("pu", 8, 1, .08), [["gw1", .2], ["gw2", .16], ["gw3", .3], ["gw2", .16], ["gw3", .3], ["gw2", .16]])); cat.dur = .6; break;
       case "rollen": zeige("ro8", "lieg", reihe("ro", 1, 7, .12).concat(reihe("ro", 6, 3, .12), reihe("ro", 4, 7, .12))); cat.dur = lang(2.5, 4); if (Math.random() < .5) sag(pick(SAGT.spiel), 1800); break;
       case "hoch": zeige("hoch", "sitz"); cat.dur = lang(2, 3.5); if (Math.random() < .6) setTimeout(() => cat.act === "hoch" && sag(pick(SAGT.fang[weather]), 1500), 500); break;
       case "fuatta": zeige("sitzen", "sitz"); cat.dur = 4.5; sag(pick(SAGT.fuatta), 3800); break;
@@ -278,6 +317,8 @@ const Gigio = (() => {
         zeige("hinten_m", "sitz", [["hinten_m", .9], ["hinten_l", .45], ["hinten_m", .35], ["hinten_r", .55], ["hinten_m", .35], ["hinten_l", .45], ["hinten_m", .6]]);
         cat.dur = .3; if (Math.random() < .5) setTimeout(() => cat.act === "beleidigt" && sag(pick(["Hmpf.", "Ich rede nicht mit dir.", "Pff."]), 1600), 600); break;
       case "strecken": zeige("st8", "steh", [["st1", .12], ["st2", .12], ["st3", .5], ["st4", .7], ["st5", .14], ["st6", .12], ["st7", .12]]); cat.dur = .5; break;
+      case "pfote": zeige("pf9", "sitz", reihe("pf", 1, 9, .09).concat(reihe("pf", 2, 8, .08))); cat.dur = .5; if (Math.random() < .4) sag(pick(["Hab dich.", "Da war was.", "Meins."]), 1400); break;
+      case "schwanz": zeige("sw1", "sitz", reihe("sw", 1, 9, .11).concat(reihe("sw", 8, 1, .11), reihe("sw", 2, 9, .11), reihe("sw", 8, 2, .11))); cat.dur = lang(.5, 2); break;
       case "seitsitz": zeige("seitsitz", "sitz"); cat.dur = lang(3, 5); break;
       case "doesen": zeige("liegen_lang", "lieg"); cat.dur = weather === "nacht" ? lang(10, 18) : lang(5, 9); cat.zzT = 2; break;
       case "zoomies": {   // Rennanfall: dreimal schnell hin und her, dann umfallen
