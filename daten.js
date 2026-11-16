@@ -330,16 +330,21 @@ const Wetter = (() => {
     const ort = await ortP;
     const d = baue(stunden, om?.daily || null, new Date(), ort, lat, lon, quellen, lauf, nc);
     d.standortFrei = !!pos; d.standortFehler = pos ? null : st.fehler; d.gewaehlt = !!wahl;
-    d.messung = await messP; const lu = await luftP; d.pollen = lu ? lu.pollen : null;
     const uvTage = {}; (om?.daily?.time || []).forEach((t, i) => { const u = om.daily.uv_index_max?.[i]; if (u != null) uvTage[t] = Math.round(u); });
-    d.woche.forEach(w => {
-      w.uv = uvTage[w.datum] ?? null; w.uv_text = uvText(w.uv);
-      const a = lu?.tage?.[w.datum]; w.luft = a != null ? Math.round(a) : null; w.luft_text = luftText(a);
-    });
-    d.luft = lu && (lu.jetzt != null || d.woche[0]?.luft != null) ? { jetzt: lu.jetzt, max: d.woche[0]?.luft ?? null, text: luftText(lu.jetzt ?? d.woche[0]?.luft) } : null;
+    d.woche.forEach(w => { w.uv = uvTage[w.datum] ?? null; w.uv_text = uvText(w.uv); w.luft = null; });
     const uvJ = om?.current?.uv_index, uvM = om?.daily?.uv_index_max?.[0];
     d.uv = uvM != null || uvJ != null ? { jetzt: uvJ != null ? Math.round(uvJ) : null, max: uvM != null ? Math.round(uvM) : null, text: uvText(uvM ?? uvJ) } : null;
-    if (d.messung) d.quellen = [...new Set(["GeoSphere Austria (CC BY 4.0)", ...d.quellen])];
+    d.messung = null; d.pollen = null; d.luft = null;
+    // Messwerte und Luftqualitaet duerfen die Anzeige nicht aufhalten: kommen sie spaeter, werden sie nachgereicht
+    const extras = Promise.all([messP, luftP]).then(([m, lu]) => {
+      d.messung = m; d.pollen = lu ? lu.pollen : null;
+      d.woche.forEach(w => { const a = lu?.tage?.[w.datum]; w.luft = a != null ? Math.round(a) : null; w.luft_text = luftText(a); });
+      d.luft = lu && (lu.jetzt != null || d.woche[0]?.luft != null) ? { jetzt: lu.jetzt, max: d.woche[0]?.luft ?? null, text: luftText(lu.jetzt ?? d.woche[0]?.luft) } : null;
+      if (m) d.quellen = [...new Set(["GeoSphere Austria (CC BY 4.0)", ...d.quellen])];
+      return d;
+    });
+    await Promise.race([extras, new Promise(r => setTimeout(r, 300))]);
+    Object.defineProperty(d, "spaeter", { value: extras, enumerable: false });
     return d;
   }
   return { laden, suche, _test: { baue, stundenGeo, nowcast } };

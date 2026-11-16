@@ -238,6 +238,8 @@ html.cat-on .feedbtn { display: inline-flex; }
 #splash button { display: none; margin-top: 20px; font: inherit; font-size: 16px; font-weight: 600; color: #16263a; background: #fff; border: 0; border-radius: 14px; padding: 12px 22px; min-height: 44px; }
 #splash.fehler button { display: inline-block; }
 html.leer main { visibility: hidden; }
+/* Ortswechsel: alter Inhalt tritt zurueck, bis die Daten des neuen Orts da sind */
+html.wechsel main > *:not(.hero), html.wechsel .hero > *:not(.loc) { opacity: .28; filter: blur(3px); pointer-events: none; transition: opacity .2s, filter .2s; }
 /* Ortswahl */
 .hero .loc { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; min-height: 36px; padding: 6px 12px 6px 10px; margin: 0 auto 4px;
   background: var(--panel); border: .5px solid var(--line); border-radius: 999px; box-shadow: inset 0 .5px 0 var(--glass-edge); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); -webkit-tap-highlight-color: transparent; }
@@ -291,8 +293,8 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611161627"></script>
-<script src="gigio.js?v=202611161627"></script>
+<script src="daten.js?v=202611161633"></script>
+<script src="gigio.js?v=202611161633"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -594,7 +596,9 @@ function render() {
 }
 
 let laedt = false, zuletzt = 0;
+const NADEL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-10.4a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg>`;
 function zeigeAlter() {
+  if (WECHSEL) { $("loc").innerHTML = `${NADEL}${WECHSEL}<span class="alter">· wird geladen …</span>`; return; }
   if (!DATA) return;
   const min = Math.max(0, Math.round((Date.now() - new Date(DATA.stand).getTime()) / 60000));
   const alter = min < 1 ? "gerade aktualisiert" : min < 60 ? `vor ${min} min aktualisiert` : `vor ${Math.round(min / 60)} h aktualisiert`;
@@ -604,17 +608,24 @@ setInterval(zeigeAlter, 30000);
 const lese = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
 const schreibe = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 let ORTWAHL = lese("ortwahl", null), ORTE = lese("orte", []);
-async function load() {
-  if (laedt) return; laedt = true;
-  const wahl = ORTWAHL;
-  try {
-    const neu = await Wetter.laden(wahl);
-    if (wahl === ORTWAHL) { DATA = neu; zuletzt = Date.now(); schreibe("letzte", DATA); }
-  } catch (e) {
-    if (!DATA) DATA = lese("letzte", null);
-  }
+let ladeNr = 0, WECHSEL = null, wechselAlt = false;
+const ortKey = o => o ? `letzte:${o.lat.toFixed(3)},${o.lon.toFixed(3)}` : "letzte:gps";
+function fertigGeladen() { WECHSEL = null; document.documentElement.classList.remove("wechsel"); }
+async function load(neuStart = false) {
+  if (laedt && !neuStart) return;
+  laedt = true; const nr = ++ladeNr, wahl = ORTWAHL;
+  let neu = null;
+  try { neu = await Wetter.laden(wahl); } catch (e) {}
+  if (nr !== ladeNr) return;                           // inzwischen wurde ein anderer Ort gewaehlt
   laedt = false;
-  if (wahl !== ORTWAHL) return load();                 // Ort wurde inzwischen gewechselt
+  const merke = () => { schreibe("letzte", DATA); schreibe(ortKey(wahl), DATA); };
+  if (neu) {
+    DATA = neu; zuletzt = Date.now(); merke(); fertigGeladen();
+    neu.spaeter?.then(() => { if (DATA === neu) { merke(); render(); } });      // Messwerte nachreichen
+  } else if (WECHSEL && DATA && wechselAlt) { fertigGeladen();        // zwischengespeicherter Stand des Orts bleibt stehen
+  } else if (WECHSEL) {                                // neuer Ort nicht erreichbar: ehrlich sagen, alten Stand nicht als neuen ausgeben
+    $("loc").innerHTML = `${WECHSEL} · nicht erreichbar, tippen zum Ändern`; return;
+  } else if (!DATA) DATA = lese("letzte", null);
   if (!DATA) { $("splash").classList.add("fehler"); $("splashText").textContent = "Keine Wetterdaten erreichbar."; return; }
   render();
 }
@@ -628,7 +639,12 @@ function orteZeichnen() {
 }
 function waehle(o) {
   ORTWAHL = o; schreibe("ortwahl", o); $("orte").hidden = true; document.body.style.overflow = "";
-  $("loc").textContent = (o ? o.name : "Standort") + " · wird geladen …"; zuletzt = 0; load();
+  WECHSEL = o ? o.name : "Aktueller Standort"; zuletzt = 0; scrollTo(0, 0);
+  const alt = lese(ortKey(o), null);                    // letzter bekannter Stand dieses Orts, sofort zeigen
+  wechselAlt = !!(alt && Date.now() - new Date(alt.stand).getTime() < 6 * 36e5);
+  if (wechselAlt) { DATA = alt; document.documentElement.classList.remove("wechsel"); render(); }
+  else document.documentElement.classList.add("wechsel");
+  zeigeAlter(); load(true);
 }
 let TREFFER = [], suchT = 0, suchNr = 0;
 async function sucheOrt() {
@@ -711,7 +727,7 @@ setInterval(load, 10 * 60 * 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - zuletzt > 5 * 60 * 1000) load(); });
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611161627";
+const VERSION = "202611161633";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
