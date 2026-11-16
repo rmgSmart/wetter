@@ -162,12 +162,13 @@ const Gigio = (() => {
   const main = document.querySelector("main"), layer = document.createElement("div"); layer.id = "gigio-layer"; main.appendChild(layer);
   let weather = "regen";
   let lastFed = 0; try { lastFed = +localStorage.getItem("gigio-fed") || 0; } catch (e) {}
-  for (const n in SPR) { const i = new Image(); i.src = `foto/${n}.png`; }   // vorladen
+  const BILD = {};                                 // vorladen und dekodieren, damit beim Umschalten nichts aufblitzt
+  for (const n in SPR) { const i = new Image(); i.src = `foto/${n}.png`; if (i.decode) i.decode().catch(() => {}); BILD[n] = i; }
 
   const root = document.createElement("div"); root.id = "gigio";
   root.innerHTML = `<div class="squash"><div class="box" role="button" tabindex="0" aria-label="Gigio, antippen"><img alt="" draggable="false"></div></div>`;
   layer.appendChild(root); layer.hidden = true;
-  const squash = root.querySelector(".squash"), box = root.querySelector(".box"), img = root.querySelector("img");
+  const squash = root.querySelector(".squash"), box = root.querySelector(".box"); let img = root.querySelector("img");
 
   const cat = { x: 0, y: 0, dir: 1, plat: 0, pose: "", act: "", t: 0, dur: 3, queue: [], hop: null, walk: null, step: 0,
                 blinkT: 3, seq: null, land: 0, zzT: 0, heartT: 0, pop: 0, offscreen: 0, bubble: null, bowl: null, tapHop: 0, hopY: 0 };
@@ -187,16 +188,18 @@ const Gigio = (() => {
 
   /* ---------- Darstellung ---------- */
   // Weicher Uebergang: das alte Bild blendet aus, waehrend das neue einblendet
-  function setPose(n, federn = true) {
+  // blend: 0 = harter Schnitt (Bildfolgen), sonst Dauer in ms. Das neue Bild steht sofort voll da,
+  // das alte blendet darueber aus. So gibt es kein Durchscheinen und kein Flackern.
+  function setPose(n, federn = true, blend = federn ? 220 : 0) {
     if (cat.pose === n) return;
-    if (cat.pose && !still) {
+    if (cat.pose && !still && blend) {
+      squash.querySelectorAll(".ghost").forEach(g => g.remove());
       const alt = box.cloneNode(true); alt.classList.add("ghost"); alt.removeAttribute("tabindex"); alt.removeAttribute("role");
-      squash.appendChild(alt); const ms = federn ? 260 : 110;
-      alt.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing: "ease-out" }).onfinish = () => alt.remove();
-      img.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, easing: "ease-in" });
+      squash.appendChild(alt);
+      alt.animate([{ opacity: 1 }, { opacity: 0 }], { duration: blend, easing: "ease-in-out" }).onfinish = () => alt.remove();
     }
     cat.pose = n; const s = SPR[n];
-    img.src = `foto/${n}.png`;
+    const neu = BILD[n]; neu.alt = ""; neu.draggable = false; box.replaceChild(neu, img); img = neu;   // fertig dekodiertes Bild einsetzen
     const k = K * (s.k || 1);
     box.style.width = s.w * k + "px"; box.style.height = s.h * k + "px";
     box.style.left = -s.ax * s.w * k + "px"; box.style.top = -s.ay * s.h * k + "px";
@@ -211,7 +214,7 @@ const Gigio = (() => {
   const gangPose = () => cat.walk && cat.walk.v > 85 ? RENNEN[cat.step % 6] : GEHEN[cat.step % 7];
   function folge(list, end) {
     if (!list.length || still) { if (end) setPose(end); return 0; }
-    cat.seq = { list, i: 0, t: 0, end }; setPose(list[0][0]);
+    cat.seq = { list, i: 0, t: 0, end }; setPose(list[0][0], false, 160);
     return list.reduce((a, b) => a + b[1], 0);
   }
   function zeige(n, art, extra = []) {
@@ -228,9 +231,9 @@ const Gigio = (() => {
   function seqSchritt(dt) {
     const q = cat.seq; q.t += dt; if (q.t < q.list[q.i][1]) return;
     q.t = 0; q.i++;
-    if (q.i < q.list.length) { setPose(q.list[q.i][0]); return; }
+    if (q.i < q.list.length) { setPose(q.list[q.i][0], false, q.list[q.i][1] >= .5 ? 450 : 0); return; }
     cat.seq = null;
-    if (q.end) setPose(q.end); else if (cat.walk) setPose(gangPose(), false);
+    if (q.end) setPose(q.end, false, 200); else if (cat.walk) setPose(gangPose(), false);
   }
 
   /* ---------- Sprechblasen und Effekte ---------- */
