@@ -237,8 +237,13 @@ html.cat-on .feedbtn { display: grid; }
 #splash.fehler button { display: inline-block; }
 html.leer main { visibility: hidden; }
 /* Ortswahl */
-.loc { background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 10px 14px; margin: -10px auto; display: block; min-height: 44px; -webkit-tap-highlight-color: transparent; }
-.loc::after { content: " ▾"; opacity: .7; }
+.hero .loc { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; min-height: 36px; padding: 6px 12px 6px 10px; margin: 0 auto 4px;
+  background: var(--panel); border: .5px solid var(--line); border-radius: 999px; box-shadow: inset 0 .5px 0 var(--glass-edge); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); -webkit-tap-highlight-color: transparent; }
+.hero .loc:active { transform: scale(.97); opacity: .85; }
+.hero .loc svg { width: 14px; height: 14px; flex: none; }
+.hero .loc .alter { font-weight: 400; color: var(--soft); }
+html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: auto; margin: 0; max-width: calc(100% - 54px); }
+.hero .loc { white-space: nowrap; max-width: 100%; overflow: hidden; }
 .mess { font-size: 12.5px; color: var(--soft); margin-top: 6px; }
 #orte { position: fixed; inset: 0; z-index: 70; background: rgba(4,10,18,.55); display: flex; align-items: flex-end; justify-content: center; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 #orte[hidden] { display: none; }
@@ -285,8 +290,8 @@ html.leer main { visibility: hidden; }
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611161611"></script>
-<script src="gigio.js?v=202611161611"></script>
+<script src="daten.js?v=202611161623"></script>
+<script src="gigio.js?v=202611161623"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -469,6 +474,7 @@ function cardDetails(d) {
   if (j.risiko) t.push(tile("Regen in dieser Stunde", `<span class="klein">${REGEN[j.risiko] || j.risiko}</span>`));
   t.push(tile("Sonnenschein heute", de(h.sonne_h), "Stunden"));
   if (d.uv) t.push(tile("UV-Index heute", d.uv.max ?? d.uv.jetzt, d.uv.text + (d.uv.jetzt != null && d.uv.max != null && !d.nacht ? ", jetzt " + d.uv.jetzt : "")));
+  if (d.luft) t.push(tile("Luftqualität", `<span class="klein">${d.luft.text}</span>`, d.luft.jetzt != null ? "Index " + d.luft.jetzt : ""));
   if (!d.nacht && j.strahlung != null) t.push(tile("Sonnenstrahlung", j.strahlung, "W/m²"));
   if (j.schneefallgrenze != null && j.schneefallgrenze < 1200) t.push(tile("Schneefallgrenze", j.schneefallgrenze, "m"));
   if (cape && j.cape >= 100) t.push(tile("Gewitter", `<span class="klein">${cape}</span>`));
@@ -505,6 +511,7 @@ function cardWoche(d) {
         ${tile("Aufgang", w.sonnenaufgang)}${tile("Untergang", w.sonnenuntergang)}
         ${tile("Sonne", de(w.sonne_h), "h")}${tile("Böen bis", w.boe, "km/h")}
         ${tile("Niederschlag", de(w.regen), "mm")}${tile("Regenrisiko", w.regen_prozent != null ? w.regen_prozent : "?", "%")}
+        ${w.uv != null ? tile("UV-Index", w.uv, w.uv_text) : ""}${w.luft != null ? `<div class="tile"><div class="k">Luftqualität</div><div class="v klein">${w.luft_text}</div></div>` : ""}
         ${w.wolken != null ? tile("Bewölkung", w.wolken, "%") + tile("Schneefall ab", w.schneefallgrenze_min != null ? w.schneefallgrenze_min : "?", "m") + `<div class="tile"><div class="k">Art</div><div class="v klein">${w.arten && w.arten.length ? w.arten.join(", ") : "trocken"}</div></div>` : ""}
         </div>${strip}<p class="note">${w.text}</p></div>`;
     }
@@ -590,7 +597,7 @@ function zeigeAlter() {
   if (!DATA) return;
   const min = Math.max(0, Math.round((Date.now() - new Date(DATA.stand).getTime()) / 60000));
   const alter = min < 1 ? "gerade aktualisiert" : min < 60 ? `vor ${min} min aktualisiert` : `vor ${Math.round(min / 60)} h aktualisiert`;
-  $("loc").textContent = `${DATA.ort} · ${alter}`;
+  $("loc").innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-10.4a6.5 6.5 0 0 1 13 0C18.500 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg>${DATA.ort}<span class="alter">· ${alter}</span><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 setInterval(zeigeAlter, 30000);
 const lese = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
@@ -703,7 +710,7 @@ setInterval(load, 10 * 60 * 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - zuletzt > 5 * 60 * 1000) load(); });
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611161611";
+const VERSION = "202611161623";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();

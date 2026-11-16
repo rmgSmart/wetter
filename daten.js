@@ -122,15 +122,18 @@ const Wetter = (() => {
 
   /* ---------- UV und Pollen (Open-Meteo, Copernicus) ---------- */
   const POLLEN = { alder_pollen: ["Erle", 10, 70], birch_pollen: ["Birke", 10, 70], grass_pollen: ["Gräser", 5, 30], mugwort_pollen: ["Beifuß", 5, 30], olive_pollen: ["Olive", 10, 70], ragweed_pollen: ["Ragweed", 5, 20] };
+  const luftText = a => a == null ? null : a <= 20 ? "sehr gut" : a <= 40 ? "gut" : a <= 60 ? "mäßig" : a <= 80 ? "schlecht" : a <= 100 ? "sehr schlecht" : "extrem schlecht";
   async function luft(lat, lon) {
-    const j = await hole(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&timezone=auto&forecast_days=1&hourly=${Object.keys(POLLEN).join(",")}`, 12000);
-    const h = j.hourly || {}, out = [];
+    const j = await hole(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&timezone=auto&forecast_days=5&hourly=european_aqi,${Object.keys(POLLEN).join(",")}`, 12000);
+    const h = j.hourly || {}, zeit = h.time || [], heute = zeit[0] ? zeit[0].slice(0, 10) : "", pollen = [], tage = {};
     for (const k in POLLEN) {
-      const w = (h[k] || []).filter(x => x != null); if (!w.length) continue;
+      const w = (h[k] || []).filter((x, i) => x != null && zeit[i].slice(0, 10) === heute); if (!w.length) continue;
       const m = Math.max(...w), [name, mittel, hoch] = POLLEN[k];
-      if (m >= mittel) out.push({ name, wert: Math.round(m), stufe: m >= hoch ? "hoch" : "mäßig" });
+      if (m >= mittel) pollen.push({ name, wert: Math.round(m), stufe: m >= hoch ? "hoch" : "mäßig" });
     }
-    return out;
+    (h.european_aqi || []).forEach((x, i) => { if (x != null) { const t = zeit[i].slice(0, 10); tage[t] = Math.max(tage[t] ?? 0, x); } });
+    const jetztI = zeit.findIndex(t => new Date(t).getTime() > Date.now() - 36e5), jetzt = h.european_aqi?.[Math.max(0, jetztI)];
+    return { pollen, tage, jetzt: jetzt != null ? Math.round(jetzt) : null };
   }
   const uvText = u => u == null ? null : u < 3 ? "niedrig" : u < 6 ? "mäßig" : u < 8 ? "hoch" : u < 11 ? "sehr hoch" : "extrem";
 
@@ -327,7 +330,13 @@ const Wetter = (() => {
     const ort = await ortP;
     const d = baue(stunden, om?.daily || null, new Date(), ort, lat, lon, quellen, lauf, nc);
     d.standortFrei = !!pos; d.standortFehler = pos ? null : st.fehler; d.gewaehlt = !!wahl;
-    d.messung = await messP; d.pollen = await luftP;
+    d.messung = await messP; const lu = await luftP; d.pollen = lu ? lu.pollen : null;
+    const uvTage = {}; (om?.daily?.time || []).forEach((t, i) => { const u = om.daily.uv_index_max?.[i]; if (u != null) uvTage[t] = Math.round(u); });
+    d.woche.forEach(w => {
+      w.uv = uvTage[w.datum] ?? null; w.uv_text = uvText(w.uv);
+      const a = lu?.tage?.[w.datum]; w.luft = a != null ? Math.round(a) : null; w.luft_text = luftText(a);
+    });
+    d.luft = lu && (lu.jetzt != null || d.woche[0]?.luft != null) ? { jetzt: lu.jetzt, max: d.woche[0]?.luft ?? null, text: luftText(lu.jetzt ?? d.woche[0]?.luft) } : null;
     const uvJ = om?.current?.uv_index, uvM = om?.daily?.uv_index_max?.[0];
     d.uv = uvM != null || uvJ != null ? { jetzt: uvJ != null ? Math.round(uvJ) : null, max: uvM != null ? Math.round(uvM) : null, text: uvText(uvM ?? uvJ) } : null;
     if (d.messung) d.quellen = [...new Set(["GeoSphere Austria (CC BY 4.0)", ...d.quellen])];
