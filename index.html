@@ -203,9 +203,11 @@ html.cat-on .hero .loc { position: absolute; top: 12px; left: 52px; right: 52px;
 .hero .temp #deg.back { animation: back .6s ease-out; }
 @keyframes fall { 0% { transform: translate(0,0) rotate(0); opacity: 1; } 20% { transform: translate(10px,-14px) rotate(40deg); } 100% { transform: translate(46px,420px) rotate(380deg); opacity: 0; } }
 @keyframes back { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: none; } }
-.feedbtn { position: absolute; right: 0; top: 0; width: 44px; height: 44px; border-radius: 50%; display: none; place-items: center; cursor: pointer; padding: 0; color: var(--ink);
-  background: var(--panel); border: .5px solid var(--line); box-shadow: inset 0 1px 0 var(--glass-edge); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
-html.cat-on .feedbtn { display: grid; }
+.feedbtn { display: none; align-items: center; gap: 7px; flex: none; min-height: 44px; padding: 0 14px 0 12px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 15px; font-weight: 600; color: var(--ink);
+  background: var(--lift); border: .5px solid var(--line); box-shadow: inset 0 .5px 0 var(--glass-edge); -webkit-tap-highlight-color: transparent; }
+.feedbtn:active { transform: scale(.96); }
+.catmode label { flex: 1; min-width: 0; }
+html.cat-on .feedbtn { display: inline-flex; }
 .feedbtn svg { width: 24px; height: 24px; }
 .feedbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .catmode { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; }
@@ -242,7 +244,7 @@ html.leer main { visibility: hidden; }
 .hero .loc:active { transform: scale(.97); opacity: .85; }
 .hero .loc svg { width: 14px; height: 14px; flex: none; }
 .hero .loc .alter { font-weight: 400; color: var(--soft); }
-html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: auto; margin: 0; max-width: calc(100% - 54px); }
+html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin: 0 auto; width: -webkit-fit-content; width: fit-content; }
 .hero .loc { white-space: nowrap; max-width: 100%; overflow: hidden; }
 .mess { font-size: 12.5px; color: var(--soft); margin-top: 6px; }
 #orte { position: fixed; inset: 0; z-index: 70; background: rgba(4,10,18,.55); display: flex; align-items: flex-end; justify-content: center; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
@@ -275,7 +277,6 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: auto; mar
 <div id="ptr" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M20.4 3.2v5.6h-5.6z" fill="#fff"/></svg></div>
 <main>
   <section class="hero" aria-label="Aktuelles Wetter">
-    <button type="button" class="feedbtn" id="feedbtn" aria-label="Gigio füttern"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12.5h17l-1.6 5.2a2 2 0 0 1-1.9 1.4H7a2 2 0 0 1-1.9-1.4z"/><circle cx="9" cy="10.4" r="1.2" fill="currentColor" stroke="none"/><circle cx="12.4" cy="9.6" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.6" cy="10.6" r="1.2" fill="currentColor" stroke="none"/></svg></button>
     <button type="button" class="loc" id="loc" aria-label="Ort wählen"></button>
     <div class="stale" id="stale" hidden></div>
     <div class="temp" id="temp"></div>
@@ -285,13 +286,13 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: auto; mar
   </section>
   <section class="card summary" aria-label="Zusammenfassung"><div class="big" id="icon"></div><p class="satz" id="satz"></p></section>
   <div id="cards"></div>
-  <section class="card catmode"><label for="catmode">Gigio Mode<small>Gigio wohnt auf der Seite</small></label><input type="checkbox" id="catmode" role="switch"></section>
+  <section class="card catmode"><label for="catmode">Gigio Mode<small>Gigio wohnt auf der Seite</small></label><button type="button" class="feedbtn" id="feedbtn" aria-label="Gigio füttern"><span>Füttern</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12.5h17l-1.6 5.2a2 2 0 0 1-1.9 1.4H7a2 2 0 0 1-1.9-1.4z"/><circle cx="9" cy="10.4" r="1.2" fill="currentColor" stroke="none"/><circle cx="12.4" cy="9.6" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.6" cy="10.6" r="1.2" fill="currentColor" stroke="none"/></svg></button><input type="checkbox" id="catmode" role="switch"></section>
   <div class="place"><div class="ort" id="ort"></div><div class="stand" id="stand"></div><div id="standortHilfe"></div></div>
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611161623"></script>
-<script src="gigio.js?v=202611161623"></script>
+<script src="daten.js?v=202611161627"></script>
+<script src="gigio.js?v=202611161627"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -710,7 +711,7 @@ setInterval(load, 10 * 60 * 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - zuletzt > 5 * 60 * 1000) load(); });
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611161623";
+const VERSION = "202611161627";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();

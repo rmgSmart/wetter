@@ -399,7 +399,8 @@ const Gigio = (() => {
       }
       case "feed": {
         const bettelt = cat.act === "fuatta";
-        const t = plats.findIndex(q => q.kind === "temp"), pi = visible(p) ? cat.plat : t, q = plats[pi];
+        const t = plats.findIndex(q => q.kind === "temp"); let unten = -1; plats.forEach((q, i) => { if (visible(q)) unten = i; });   // unterste sichtbare Kante, nahe am Futterknopf
+        const pi = visible(p) ? cat.plat : unten >= 0 ? unten : t, q = plats[pi];
         let bx = pi === cat.plat ? cat.x + (cat.x < (q.x1 + q.x2) / 2 ? 80 : -80) : (q.x1 + q.x2) / 2 + 20;
         bx = Math.max(q.x1 + 14, Math.min(q.x2 - 14, bx));
         schuessel(pi, bx);
