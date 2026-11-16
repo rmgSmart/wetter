@@ -227,7 +227,11 @@ const Wetter = (() => {
       teile.push(rest.some(s => s.symbol === "nebel") ? "Trocken, zeitweise Nebel" : w >= 85 ? "Trocken und durchgehend bedeckt"
         : w >= 50 ? "Trocken bei vielen Wolken" : w >= 20 ? "Trocken und zeitweise sonnig" : "Trocken und klar");
     }
-    if (boe >= 50) teile.push(`Böen bis ${boe} km/h`);
+    if (boe >= 40) {                                   // wann und wie stark: Zeitfenster rund um die Spitze
+      const grenze = Math.max(40, boe * .8), stark = rest.filter(x => x.boe >= grenze);
+      const h0 = +stark[0].zeit.slice(11, 13), h1 = +stark[stark.length - 1].zeit.slice(11, 13);
+      teile.push(stark.length >= rest.length - 1 ? `Böen bis ${boe} km/h` : h0 === h1 ? `Böen bis ${boe} km/h um ${h0} Uhr` : `Böen bis ${boe} km/h zwischen ${h0} und ${h1} Uhr`);
+    }
     if (rest.length) {
       const tief = Math.min(...rest.map(s => s.temp));
       if (jetzt.getHours() < 14) teile.push(`Höchstwert ${Math.round(tmax)} Grad`);
