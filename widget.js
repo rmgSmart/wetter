@@ -186,15 +186,17 @@ function stundenTon(s) {
   if (sonne >= .25 || s.wolken < 40) return ["255,196,60", .14 + .3 * Math.max(sonne, 1 - s.wolken / 100)];
   return ["120,132,146", .14 + .16 * s.wolken / 100];
 }
-function verlauf(st, W, H) {
-  const X0 = 20, X1 = W - 20, schritt = (X1 - X0) / (st.length - 1), x = i => X0 + i * schritt;
+function verlauf(alle, W, H) {
+  let st = alle;
+  // Gleich breite Spalten alle 3 Stunden, symmetrisch ueber die ganze Breite; die Kurve nutzt dieselbe Einteilung
+  const SP = 3, n = Math.min(8, Math.floor((st.length - 1) / SP) + 1), zelle = W / n, x = i => zelle * (i / SP + .5), schritt = zelle / SP;
   const yZeit = 1, ySym = 30, yTxt = 41, yT0 = 59, yT1 = 70, yBoe = H - 14;
   const dc = new DrawContext(); dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
-  // Hintergrund, Nacht dunkler
+  // ruhiger Hintergrund
   dc.setFillColor(farbe("#ffffff", .1)); dc.fillRect(new Rect(0, 0, W, H));
-  // Jede Stunde wie in der App getoent: Regen blau, klare Nacht dunkelblau, Sonne gelb, sonst grau. Nach unten blasser.
-  // Welche Stunden beschriftet werden: jetzt und dann alle 3 Stunden, mit Mindestabstand
-  const zeig = []; st.forEach((s, i) => { const h = +s.zeit.slice(11, 13); if (i === 0 || (h % 3 === 0 && x(i) - x(zeig[zeig.length - 1]) >= 30 && x(i) <= X1 - 4)) zeig.push(i); });
+  // Beschriftete Spalten: jetzt und dann alle 3 Stunden
+  const zeig = []; for (let k = 0; k < n; k++) zeig.push(k * SP);
+  st = st.slice(0, (n - 1) * SP + 1);
   // Regen ganz dezent unter der Kurve
   st.forEach((s, i) => { if (s.regen < .05) return; const h = Math.max(1.5, Math.min(1, s.regen / 3) * 9); dc.setFillColor(farbe("#6cc4ff", .5)); dc.fillRect(new Rect(x(i) - schritt * .35, yT1 + 4 - h, schritt * .7, h)); });
   // Temperaturkurve, weich
