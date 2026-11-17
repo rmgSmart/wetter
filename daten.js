@@ -107,12 +107,12 @@ const Wetter = (() => {
   const STATION = "https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min";
   const km = (a, b, c, d) => { const R = Math.PI / 180, x = (d - b) * R * Math.cos((a + c) / 2 * R), y = (c - a) * R; return Math.hypot(x, y) * 6371; };
   async function naechsteStation(lat, lon) {
-    const key = `station:${lat.toFixed(2)},${lon.toFixed(2)}`;
+    const key = `station2:${lat.toFixed(2)},${lon.toFixed(2)}`;     // neuer Schluessel, alte Auswahl mit 20 km verwerfen
     try { const c = JSON.parse(localStorage.getItem(key)); if (c && Date.now() - c.t < 30 * 864e5) return c.s; } catch (e) {}
     const meta = await hole(STATION + "/metadata", 20000);
     const alle = (meta.stations || []).filter(x => x.is_active !== false && x.lat != null && x.lon != null)
       .map(x => ({ id: String(x.id), name: x.name, km: km(lat, lon, +x.lat, +x.lon) })).sort((a, b) => a.km - b.km);
-    const s = alle[0] && alle[0].km <= 20 ? alle[0] : null;
+    const s = alle[0] && alle[0].km <= 1.5 ? alle[0] : null;      // nur wenn die Station wirklich in der Naehe ist
     try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), s })); } catch (e) {}
     return s;
   }
