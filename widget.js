@@ -178,7 +178,7 @@ function pfeil(dc, x, y, grad, c) {          // Pfeil in Windrichtung (wohin der
 }
 function verlauf(st, W, H) {
   const X0 = 16, X1 = W - 16, schritt = (X1 - X0) / (st.length - 1), x = i => X0 + i * schritt;
-  const yZeit = 2, ySym = 28, yT0 = 49, yT1 = 64, yBoe = H - 15;
+  const yZeit = 1, ySym = 31, yT0 = 50, yT1 = 64, yBoe = H - 15;
   const dc = new DrawContext(); dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
   // Hintergrund, Nacht dunkler
   const bg = new Path(); bg.addRoundedRect(new Rect(0, 0, W, H), 14, 14); dc.addPath(bg); dc.setFillColor(farbe("#ffffff", .09)); dc.fillPath();
