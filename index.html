@@ -379,8 +379,8 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611170834"></script>
-<script src="gigio.js?v=202611170834"></script>
+<script src="daten.js?v=202611170840"></script>
+<script src="gigio.js?v=202611170840"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -838,11 +838,22 @@ addEventListener("resize", () => { size(); const f = fx; fx = ""; setFx(f); });
 size();
 try { DATA = JSON.parse(localStorage.getItem("letzte")); if (DATA) render(); } catch (e) {}   // letzten Stand sofort zeigen
 load();
-setInterval(load, 10 * 60 * 1000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - zuletzt > 5 * 60 * 1000) load(); });
+// Automatisch neu laden, sobald die Daten aelter als 15 Minuten sind. iOS haelt Zeitgeber im Hintergrund an,
+// deshalb wird zusaetzlich beim Zurueckkehren in die App, beim Fokus und wenn das Netz wieder da ist geprueft.
+const FRISCH = 15 * 60 * 1000;
+function frisch() {
+  if (document.hidden || WECHSEL) return;
+  const stand = DATA && DATA.stand ? new Date(DATA.stand).getTime() : 0;
+  if (Date.now() - stand > FRISCH) load();
+}
+setInterval(frisch, 60 * 1000);
+document.addEventListener("visibilitychange", frisch);
+addEventListener("pageshow", frisch);
+addEventListener("focus", frisch);
+addEventListener("online", frisch);
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611170834";
+const VERSION = "202611170840";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
