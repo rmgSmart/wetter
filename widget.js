@@ -122,6 +122,50 @@ function tempBox(stack, t) {
   b.addSpacer(); text(b, grad(t), Font.semiboldRoundedSystemFont(17), farbe("#10202a")); b.addSpacer();
 }
 
+
+/* ---------- 24-Stunden-Grafik ---------- */
+function verlauf(st) {
+  const W = 306, H = 66, X0 = 14, X1 = W - 14, schritt = (X1 - X0) / (st.length - 1);
+  const yT0 = 16, yT1 = 35, basis = 51, regenH = 12;
+  const dc = new DrawContext(); dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
+  const x = i => X0 + i * schritt;
+  // Hintergrund und Nacht
+  const bg = new Path(); bg.addRoundedRect(new Rect(0, 0, W, basis + 2), 12, 12); dc.addPath(bg); dc.setFillColor(farbe("#ffffff", .09)); dc.fillPath();
+  st.forEach((s, i) => { if (s.nacht) { dc.setFillColor(farbe("#000000", .14)); dc.fillRect(new Rect(Math.max(0, x(i) - schritt / 2), 0, Math.min(schritt, W - x(i) + schritt / 2), basis + 2)); } });
+  // Regen
+  st.forEach((s, i) => {
+    if (s.regen < .05) return;
+    const h = Math.max(2, Math.min(1, s.regen / 3) * regenH);
+    const p = new Path(); p.addRoundedRect(new Rect(x(i) - schritt * .35, basis - h, schritt * .7, h), 1.5, 1.5);
+    dc.addPath(p); dc.setFillColor(farbe("#6cc4ff", .95)); dc.fillPath();
+  });
+  // Temperatur
+  const t = st.map(s => s.temp), lo = Math.min(...t), hi = Math.max(...t), sp = Math.max(hi - lo, 2);
+  const y = v => yT1 - (v - lo) / sp * (yT1 - yT0);
+  for (let i = 0; i < st.length - 1; i++) {
+    const p = new Path(); p.move(new Point(x(i), y(t[i]))); p.addLine(new Point(x(i + 1), y(t[i + 1])));
+    dc.addPath(p); dc.setStrokeColor(tempFarbe((t[i] + t[i + 1]) / 2)); dc.setLineWidth(2.6); dc.strokePath();
+  }
+  // Beschriftung: jetzt, hoechster und tiefster Wert
+  dc.setFont(Font.semiboldRoundedSystemFont(12));
+  const marken = [[0, -1]], iMax = t.indexOf(hi), iMin = t.indexOf(lo);
+  if (iMax > 2) marken.push([iMax, -1]);
+  if (iMin > 2 && Math.abs(iMin - iMax) > 3) marken.push([iMin, 1]);
+  marken.forEach(([i, lage]) => {
+    const p = new Path(); p.addEllipse(new Rect(x(i) - 3, y(t[i]) - 3, 6, 6)); dc.addPath(p); dc.setFillColor(WEISS); dc.fillPath();
+    dc.setTextColor(WEISS); dc.setTextAlignedCenter();
+    const ty = lage < 0 ? y(t[i]) - 17 : y(t[i]) + 3;
+    dc.drawTextInRect(grad(t[i]), new Rect(Math.min(W - 34, Math.max(0, x(i) - 17)), ty, 34, 15));
+  });
+  // Uhrzeiten
+  dc.setFont(Font.semiboldSystemFont(11)); dc.setTextColor(SOFT); dc.setTextAlignedCenter();
+  st.forEach((s, i) => {
+    const h = +s.zeit.slice(11, 13);
+    if (i === 0 || (h % 3 === 0 && i > 1 && i < st.length - 1)) dc.drawTextInRect(i === 0 ? "Jetzt" : String(h), new Rect(Math.max(0, x(i) - 18), basis + 3, 36, 14));
+  });
+  return dc.getImage();
+}
+
 /* ---------- Widget ---------- */
 const w = new ListWidget();
 w.url = BASIS;
@@ -165,19 +209,11 @@ if (!d) {
   text(w, h.satz || "", Font.systemFont(13), SOFT, { zeilen: 2, skala: .85 });
   w.addSpacer(7);
 
-  // Die naechsten 12 Stunden in 2-Stunden-Schritten
-  const ab = Date.now() - 30 * 60000, st = (d.stunden || []).filter(x => new Date(x.zeit).getTime() >= ab).filter((x, i) => i % 2 === 0).slice(0, 6);
-  if (st.length) {
-    const leiste = w.addStack(); leiste.layoutHorizontally(); leiste.backgroundColor = farbe("#ffffff", .1); leiste.cornerRadius = 12; leiste.setPadding(4, 10, 4, 10);
-    st.forEach((x, i) => {
-      if (i) leiste.addSpacer();
-      const sp = leiste.addStack(); sp.layoutVertically(); sp.centerAlignContent();
-      const zeile = (f) => { const r = sp.addStack(); r.addSpacer(); f(r); r.addSpacer(); };
-      zeile(r => text(r, i === 0 ? "Jetzt" : String(+x.zeit.slice(11, 13)), Font.semiboldSystemFont(13), SOFT, { zeilen: 1 }));
-      zeile(r => symbol(r, x.symbol, x.nacht, 17));
-      zeile(r => text(r, grad(x.temp), Font.semiboldRoundedSystemFont(17), tempFarbe(x.temp)));
-    });
-    w.addSpacer(5);
+  // Die naechsten 24 Stunden als Grafik: Temperaturkurve, Regenbalken, Nacht dunkler
+  const ab = Date.now() - 30 * 60000, st = (d.stunden || []).filter(x => new Date(x.zeit).getTime() >= ab).slice(0, 25);
+  if (st.length > 3) {
+    w.addImage(verlauf(st)).imageSize = new Size(306, 66);
+    w.addSpacer(4);
   }
 
   // Heute, Morgen, Uebermorgen
@@ -185,7 +221,7 @@ if (!d) {
   d.woche.slice(0, 3).forEach((t, i) => {
     const strich = w.addStack(); strich.size = new Size(0, .7); strich.backgroundColor = LINIE; strich.addSpacer();
     w.addSpacer(4);
-    const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 50);
+    const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 48);
     const a = z.addStack(); a.layoutVertically(); a.size = new Size(86, 0);
     text(a, TAGNAME[i] || t.tag, Font.boldSystemFont(19), WEISS, { zeilen: 1, skala: .7 });
     text(a, `${t.datum.slice(8, 10)}.${t.datum.slice(5, 7)}.`, Font.mediumSystemFont(14), SOFT);
