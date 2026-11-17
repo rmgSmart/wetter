@@ -123,46 +123,92 @@ function tempBox(stack, t) {
 }
 
 
-/* ---------- 24-Stunden-Grafik ---------- */
-function verlauf(st, W) {
-  const H = 66, X0 = 14, X1 = W - 14, schritt = (X1 - X0) / (st.length - 1);
-  const yT0 = 16, yT1 = 35, basis = 51, regenH = 12;
+/* ---------- 24-Stunden-Grafik wie in der App ---------- */
+// Breite des grossen Widgets je nach iPhone (Punkte), davon geht der Rand ab
+function inhaltBreite() {
+  let b = 393; try { b = Device.screenSize().width; } catch (e) {}
+  const widget = b >= 440 ? 372 : b >= 428 ? 364 : b >= 414 ? 360 : b >= 402 ? 344 : b >= 390 ? 338 : 329;
+  return widget - 32;
+}
+const BOEFARBE = b => b >= 80 ? "#ff5e57" : b >= 60 ? "#ff9f43" : b >= 40 ? "#ffd24d" : null;
+function kreis(dc, x, y, r, c) { const p = new Path(); p.addEllipse(new Rect(x - r, y - r, 2 * r, 2 * r)); dc.addPath(p); dc.setFillColor(c); dc.fillPath(); }
+function linie(dc, x1, y1, x2, y2, c, bw) { const p = new Path(); p.move(new Point(x1, y1)); p.addLine(new Point(x2, y2)); dc.addPath(p); dc.setStrokeColor(c); dc.setLineWidth(bw); dc.strokePath(); }
+function wolke(dc, x, y, s, c) {      // Wolke mit Mittelpunkt x, y und Breite etwa 2 s
+  kreis(dc, x - .48 * s, y + .12 * s, .42 * s, c); kreis(dc, x + .05 * s, y - .18 * s, .55 * s, c); kreis(dc, x + .55 * s, y + .14 * s, .38 * s, c);
+  const p = new Path(); p.addRoundedRect(new Rect(x - .9 * s, y + .05 * s, 1.83 * s, .48 * s), .24 * s, .24 * s); dc.addPath(p); dc.setFillColor(c); dc.fillPath();
+}
+function sonne(dc, x, y, r) {
+  const c = farbe("#ffc933");
+  for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; linie(dc, x + Math.cos(a) * (r + 2), y + Math.sin(a) * (r + 2), x + Math.cos(a) * (r + 4.2), y + Math.sin(a) * (r + 4.2), c, 1.5); }
+  kreis(dc, x, y, r, c);
+}
+function mond(dc, x, y, r) {
+  const p = new Path(); p.move(new Point(x + .2 * r, y - r));
+  p.addCurve(new Point(x + .2 * r, y + r), new Point(x - 1.25 * r, y - r), new Point(x - 1.25 * r, y + r));
+  p.addCurve(new Point(x + .2 * r, y - r), new Point(x - .45 * r, y + .7 * r), new Point(x - .45 * r, y - .7 * r));
+  dc.addPath(p); dc.setFillColor(farbe("#ffe38a")); dc.fillPath();
+}
+function zeichneSymbol(dc, sym, nacht, x, y) {      // Symbol etwa 26 Punkte breit, Mitte x, y
+  const W1 = farbe("#f3f6fb"), W2 = farbe("#c6d0dc");
+  const himmel = (dx, dy, r) => nacht ? mond(dc, x + dx, y + dy, r) : sonne(dc, x + dx, y + dy, r);
+  const nass = sym.startsWith("regen") || sym === "schneeregen" || sym === "schnee" || sym === "gewitter" || sym === "nebel";
+  if (sym === "klar") return himmel(0, 0, nacht ? 7.5 : 5.5);
+  if (sym === "heiter") { himmel(4, -3, nacht ? 5.5 : 4); return wolke(dc, x - 2, y + 2.5, 7, W1); }
+  if (sym === "wolkig") { himmel(5, -4, nacht ? 4.5 : 3.5); wolke(dc, x - 1, y + 2, 8, W1); return; }
+  const dy = nass ? -3 : 0;
+  wolke(dc, x + 3.5, y - 3.5 + dy, 6, W2);
+  wolke(dc, x - 1, y + 1 + dy, 8, sym === "gewitter" ? farbe("#a99fd6") : W1);
+  if (sym.startsWith("regen") || sym === "schneeregen") {
+    const n = sym === "regen_leicht" ? 1 : sym === "regen_stark" ? 3 : 2, xs = [[0], [-3, 3], [-5, 0, 5]][n - 1];
+    xs.forEach(o => linie(dc, x + o + 1, y + 6.5, x + o - .5, y + 10.5, farbe("#49b6ff"), 1.8));
+    if (sym === "schneeregen") kreis(dc, x + 5, y + 9, 1.3, WEISS);
+  }
+  if (sym === "schnee") [-4, 0, 4].forEach((o, k) => kreis(dc, x + o, y + (k % 2 ? 10 : 8), 1.4, WEISS));
+  if (sym === "nebel") { linie(dc, x - 7, y + 8, x + 7, y + 8, W2, 1.6); linie(dc, x - 5, y + 11, x + 5, y + 11, W2, 1.6); }
+  if (sym === "gewitter") {
+    const p = new Path(); [[1, 5], [-2.5, 9.5], [0, 9.5], [-1.5, 13.5], [3.5, 8], [1, 8], [2.5, 5]].forEach(([a, b], k) => k ? p.addLine(new Point(x + a, y + b)) : p.move(new Point(x + a, y + b)));
+    p.closeSubpath(); dc.addPath(p); dc.setFillColor(farbe("#ffd60a")); dc.fillPath();
+  }
+}
+function pfeil(dc, x, y, grad, c) {          // Pfeil in Windrichtung (wohin der Wind weht)
+  const a = (grad + 180 - 90) * Math.PI / 180, l = 4.5, dx = Math.cos(a), dy = Math.sin(a);
+  linie(dc, x - dx * l, y - dy * l, x + dx * l, y + dy * l, c, 1.5);
+  linie(dc, x + dx * l, y + dy * l, x + dx * l - Math.cos(a - .6) * 3.5, y + dy * l - Math.sin(a - .6) * 3.5, c, 1.5);
+  linie(dc, x + dx * l, y + dy * l, x + dx * l - Math.cos(a + .6) * 3.5, y + dy * l - Math.sin(a + .6) * 3.5, c, 1.5);
+}
+function verlauf(st, W, H) {
+  const X0 = 16, X1 = W - 16, schritt = (X1 - X0) / (st.length - 1), x = i => X0 + i * schritt;
+  const yZeit = 2, ySym = 28, yT0 = 49, yT1 = 64, yBoe = H - 15;
   const dc = new DrawContext(); dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
-  const x = i => X0 + i * schritt;
-  // Hintergrund und Nacht
-  const bg = new Path(); bg.addRoundedRect(new Rect(0, 0, W, basis + 2), 12, 12); dc.addPath(bg); dc.setFillColor(farbe("#ffffff", .09)); dc.fillPath();
-  st.forEach((s, i) => { if (s.nacht) { dc.setFillColor(farbe("#000000", .14)); dc.fillRect(new Rect(Math.max(0, x(i) - schritt / 2), 0, Math.min(schritt, W - x(i) + schritt / 2), basis + 2)); } });
-  // Regen
-  st.forEach((s, i) => {
-    if (s.regen < .05) return;
-    const h = Math.max(2, Math.min(1, s.regen / 3) * regenH);
-    const p = new Path(); p.addRoundedRect(new Rect(x(i) - schritt * .35, basis - h, schritt * .7, h), 1.5, 1.5);
-    dc.addPath(p); dc.setFillColor(farbe("#6cc4ff", .95)); dc.fillPath();
-  });
-  // Temperatur
-  const t = st.map(s => s.temp), lo = Math.min(...t), hi = Math.max(...t), sp = Math.max(hi - lo, 2);
-  const y = v => yT1 - (v - lo) / sp * (yT1 - yT0);
-  for (let i = 0; i < st.length - 1; i++) {
-    const p = new Path(); p.move(new Point(x(i), y(t[i]))); p.addLine(new Point(x(i + 1), y(t[i + 1])));
+  // Hintergrund, Nacht dunkler
+  const bg = new Path(); bg.addRoundedRect(new Rect(0, 0, W, H), 14, 14); dc.addPath(bg); dc.setFillColor(farbe("#ffffff", .09)); dc.fillPath();
+  st.forEach((s, i) => { if (s.nacht) { const l = Math.max(0, x(i) - schritt / 2), r = Math.min(W, x(i) + schritt / 2) + (i === st.length - 1 ? 16 : 0); dc.setFillColor(farbe("#000000", .13)); dc.fillRect(new Rect(i === 0 ? 0 : l, 0, r - (i === 0 ? 0 : l), H)); } });
+  // Welche Stunden beschriftet werden: jetzt und dann alle 3 Stunden, mit Mindestabstand
+  const zeig = []; st.forEach((s, i) => { const h = +s.zeit.slice(11, 13); if (i === 0 || (h % 3 === 0 && x(i) - x(zeig[zeig.length - 1]) >= 30 && x(i) <= X1 - 4)) zeig.push(i); });
+  // Regen ganz dezent unter der Kurve
+  st.forEach((s, i) => { if (s.regen < .05) return; const h = Math.max(1.5, Math.min(1, s.regen / 3) * 10); dc.setFillColor(farbe("#6cc4ff", .55)); dc.fillRect(new Rect(x(i) - schritt * .35, yT1 + 12 - h, schritt * .7, h)); });
+  // Temperaturkurve, weich
+  const t = st.map(s => s.temp), lo = Math.min(...t), hi = Math.max(...t), sp = Math.max(hi - lo, 3), mitte = (lo + hi) / 2;
+  const y = v => (yT0 + yT1) / 2 - (v - mitte) / sp * (yT1 - yT0);
+  const P = st.map((s, i) => [x(i), y(t[i])]);
+  for (let i = 0; i < P.length - 1; i++) {
+    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+    const p = new Path(); p.move(new Point(p1[0], p1[1]));
+    p.addCurve(new Point(p2[0], p2[1]), new Point(p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6), new Point(p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6));
     dc.addPath(p); dc.setStrokeColor(tempFarbe((t[i] + t[i + 1]) / 2)); dc.setLineWidth(2.6); dc.strokePath();
   }
-  // Beschriftung: jetzt, hoechster und tiefster Wert
-  dc.setFont(Font.semiboldRoundedSystemFont(12));
-  const marken = [[0, -1]], iMax = t.indexOf(hi), iMin = t.indexOf(lo);
-  if (iMax > 2) marken.push([iMax, -1]);
-  if (iMin > 2 && Math.abs(iMin - iMax) > 3) marken.push([iMin, 1]);
-  marken.forEach(([i, lage]) => {
-    const p = new Path(); p.addEllipse(new Rect(x(i) - 3, y(t[i]) - 3, 6, 6)); dc.addPath(p); dc.setFillColor(WEISS); dc.fillPath();
-    const ty = lage < 0 ? y(t[i]) - 17 : y(t[i]) + 4, tx = Math.min(W - 34, Math.max(0, x(i) - 17));
-    if (lage > 0) { const hg = new Path(); hg.addRoundedRect(new Rect(tx + 5, ty, 24, 15), 6, 6); dc.addPath(hg); dc.setFillColor(farbe("#0b1622", .55)); dc.fillPath(); }
-    dc.setTextColor(WEISS); dc.setTextAlignedCenter();
-    dc.drawTextInRect(grad(t[i]), new Rect(tx, ty, 34, 15));
-  });
-  // Uhrzeiten
-  dc.setFont(Font.semiboldSystemFont(11)); dc.setTextColor(SOFT); dc.setTextAlignedCenter();
-  st.forEach((s, i) => {
-    const h = +s.zeit.slice(11, 13);
-    if (i === 0 || (h % 3 === 0 && i * schritt >= 40 && i < st.length - 1)) dc.drawTextInRect(i === 0 ? "Jetzt" : String(h), new Rect(Math.max(0, x(i) - 18), basis + 3, 36, 14));
+  kreis(dc, P[0][0], P[0][1], 3.2, WEISS);
+  // Spalten: Uhrzeit, Symbol, Temperatur, Boeen
+  zeig.forEach(i => {
+    const s = st[i], h = +s.zeit.slice(11, 13), cx = x(i);
+    dc.setTextAlignedCenter();
+    dc.setFont(Font.semiboldSystemFont(11)); dc.setTextColor(SOFT); dc.drawTextInRect(i === 0 ? "Jetzt" : String(h), new Rect(cx - 18, yZeit, 36, 14));
+    zeichneSymbol(dc, s.symbol, s.nacht, cx, ySym - 4);
+    dc.setFont(Font.semiboldRoundedSystemFont(14)); dc.setTextColor(WEISS); dc.drawTextInRect(grad(s.temp), new Rect(cx - 18, P[i][1] - 20, 36, 17));
+    const bf = BOEFARBE(s.boe), c = bf ? farbe(bf) : farbe("#ffffff", .62);
+    pfeil(dc, cx - 8, yBoe + 6.5, s.richtung || 0, c);
+    dc.setFont(bf ? Font.boldSystemFont(11) : Font.mediumSystemFont(11)); dc.setTextColor(c); dc.setTextAlignedLeft();
+    dc.drawTextInRect(String(s.boe), new Rect(cx - 2, yBoe, 24, 13));
   });
   return dc.getImage();
 }
@@ -212,14 +258,12 @@ if (!d) {
   text(w, satz, Font.systemFont(13), SOFT, { zeilen: 2, skala: .75 });
   w.addSpacer(7);
 
-  // Die naechsten 24 Stunden als Grafik: Temperaturkurve, Regenbalken, Nacht dunkler
+  // Die naechsten 24 Stunden als Grafik wie in der App
   const ab = Date.now() - 30 * 60000, st = (d.stunden || []).filter(x => new Date(x.zeit).getTime() >= ab).slice(0, 25);
   if (st.length > 3) {
-    // Breite des grossen Widgets je nach iPhone, abzueglich Rand. Feste Groesse, damit iOS die Grafik nicht verkleinert.
-    // Rahmen nimmt die ganze Breite, das Bild fuellt ihn aus (minimal breiter gezeichnet, damit kein Rand bleibt)
-    let breit = 316; try { breit = Device.screenSize().width >= 428 ? 342 : 316; } catch (e) {}
-    const gs = w.addStack(); gs.size = new Size(0, 66);
-    gs.backgroundImage = verlauf(st, breit); gs.addSpacer();             // als Hintergrund, so wird die Grafik nicht verkleinert
+    const breit = inhaltBreite(), hoch = 96;
+    const gs = w.addStack(); gs.size = new Size(breit, hoch);
+    gs.backgroundImage = verlauf(st, breit, hoch); gs.addSpacer();
     w.addSpacer(4);
   }
 
@@ -228,7 +272,7 @@ if (!d) {
   d.woche.slice(0, 3).forEach((t, i) => {
     const strich = w.addStack(); strich.size = new Size(0, .7); strich.backgroundColor = LINIE; strich.addSpacer();
     w.addSpacer(4);
-    const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 48);
+    const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 46);
     const a = z.addStack(); a.layoutVertically(); a.size = new Size(86, 0);
     text(a, TAGNAME[i] || t.tag, Font.boldSystemFont(19), WEISS, { zeilen: 1, skala: .7 });
     text(a, `${t.datum.slice(8, 10)}.${t.datum.slice(5, 7)}.`, Font.mediumSystemFont(14), SOFT);
