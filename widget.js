@@ -216,8 +216,9 @@ if (!d) {
   const ab = Date.now() - 30 * 60000, st = (d.stunden || []).filter(x => new Date(x.zeit).getTime() >= ab).slice(0, 25);
   if (st.length > 3) {
     // Breite des grossen Widgets je nach iPhone, abzueglich Rand. Feste Groesse, damit iOS die Grafik nicht verkleinert.
-    let breit = 306; try { breit = Device.screenSize().width >= 428 ? 332 : 306; } catch (e) {}
-    const gs = w.addStack(); gs.size = new Size(breit, 66);
+    // Rahmen nimmt die ganze Breite, das Bild fuellt ihn aus (minimal breiter gezeichnet, damit kein Rand bleibt)
+    let breit = 316; try { breit = Device.screenSize().width >= 428 ? 342 : 316; } catch (e) {}
+    const gs = w.addStack(); gs.size = new Size(0, 66);
     gs.backgroundImage = verlauf(st, breit); gs.addSpacer();             // als Hintergrund, so wird die Grafik nicht verkleinert
     w.addSpacer(4);
   }
