@@ -176,13 +176,35 @@ function pfeil(dc, x, y, grad, c) {          // Pfeil in Windrichtung (wohin der
   linie(dc, x + dx * l, y + dy * l, x + dx * l - Math.cos(a - .6) * 3.5, y + dy * l - Math.sin(a - .6) * 3.5, c, 1.5);
   linie(dc, x + dx * l, y + dy * l, x + dx * l - Math.cos(a + .6) * 3.5, y + dy * l - Math.sin(a + .6) * 3.5, c, 1.5);
 }
+function stundenTon(s) {
+  if (s.symbol === "gewitter") return ["150,110,255", .3];
+  if (s.symbol === "schnee" && s.regen >= .1) return ["230,240,255", .3];
+  if (s.regen >= .1) { const k = Math.min(1, s.regen / 3); return ["64,146,255", .18 + .37 * k]; }
+  if (s.nacht) return s.wolken < 50 ? ["40,60,140", .35] : ["120,132,146", .22];
+  if (s.symbol === "nebel") return ["200,205,210", .25];
+  const sonne = s.sonne_min != null ? s.sonne_min / 60 : 1 - s.wolken / 100;
+  if (sonne >= .25 || s.wolken < 40) return ["255,196,60", .14 + .3 * Math.max(sonne, 1 - s.wolken / 100)];
+  return ["120,132,146", .14 + .16 * s.wolken / 100];
+}
 function verlauf(st, W, H) {
-  const X0 = 16, X1 = W - 16, schritt = (X1 - X0) / (st.length - 1), x = i => X0 + i * schritt;
-  const yZeit = 1, ySym = 31, yT0 = 50, yT1 = 64, yBoe = H - 15;
+  const X0 = 20, X1 = W - 20, schritt = (X1 - X0) / (st.length - 1), x = i => X0 + i * schritt;
+  const yZeit = 2, ySym = 29, yT0 = 47, yT1 = 60, yBoe = H - 15;
   const dc = new DrawContext(); dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
   // Hintergrund, Nacht dunkler
-  const bg = new Path(); bg.addRoundedRect(new Rect(0, 0, W, H), 14, 14); dc.addPath(bg); dc.setFillColor(farbe("#ffffff", .09)); dc.fillPath();
-  st.forEach((s, i) => { if (s.nacht) { const l = Math.max(0, x(i) - schritt / 2), r = Math.min(W, x(i) + schritt / 2) + (i === st.length - 1 ? 16 : 0); dc.setFillColor(farbe("#000000", .13)); dc.fillRect(new Rect(i === 0 ? 0 : l, 0, r - (i === 0 ? 0 : l), H)); } });
+  dc.setFillColor(farbe("#ffffff", .06)); dc.fillRect(new Rect(0, 0, W, H));
+  // Jede Stunde wie in der App getoent: Regen blau, klare Nacht dunkelblau, Sonne gelb, sonst grau. Nach unten blasser.
+  // Gleiche Toene nebeneinander zu einem Block zusammenfassen, sonst entstehen feine Linien
+  const toene = st.map(s => { const [rgb, a] = stundenTon(s); return rgb + "|" + a.toFixed(2); });
+  for (let i = 0; i < st.length;) {
+    let j = i; while (j + 1 < st.length && toene[j + 1] === toene[i]) j++;
+    const [rgb, as] = toene[i].split("|"), a = +as, hex = "#" + rgb.split(",").map(v => (+v).toString(16).padStart(2, "0")).join("");
+    const l = i === 0 ? 0 : Math.round(x(i) - schritt / 2), r = j === st.length - 1 ? W : Math.round(x(j) + schritt / 2);
+    // Verlauf nach unten blasser: Grundfarbe ueber die ganze Hoehe, darueber nach oben hin weitere Lagen
+    dc.setFillColor(farbe(hex, a * .3)); dc.fillRect(new Rect(l, 0, r - l, H));
+    const lagen = 6;
+    for (let k = 1; k <= lagen; k++) { dc.setFillColor(farbe(hex, a * .7 / lagen)); dc.fillRect(new Rect(l, 0, r - l, Math.round(H * (1 - k / (lagen + 1))))); }
+    i = j + 1;
+  }
   // Welche Stunden beschriftet werden: jetzt und dann alle 3 Stunden, mit Mindestabstand
   const zeig = []; st.forEach((s, i) => { const h = +s.zeit.slice(11, 13); if (i === 0 || (h % 3 === 0 && x(i) - x(zeig[zeig.length - 1]) >= 30 && x(i) <= X1 - 4)) zeig.push(i); });
   // Regen ganz dezent unter der Kurve
@@ -261,18 +283,18 @@ if (!d) {
   // Die naechsten 24 Stunden als Grafik wie in der App
   const ab = Date.now() - 30 * 60000, st = (d.stunden || []).filter(x => new Date(x.zeit).getTime() >= ab).slice(0, 25);
   if (st.length > 3) {
-    const breit = inhaltBreite(), hoch = 96;
-    const gs = w.addStack(); gs.size = new Size(breit, hoch);
+    const breit = inhaltBreite() + 12, hoch = 90;
+    const gs = w.addStack(); gs.size = new Size(0, hoch); gs.cornerRadius = 14;    // volle Breite, das Bild fuellt den Rahmen
     gs.backgroundImage = verlauf(st, breit, hoch); gs.addSpacer();
-    w.addSpacer(4);
+    w.addSpacer(3);
   }
 
   // Heute, Morgen, Uebermorgen
   const TAGNAME = ["Heute", "Morgen"];
   d.woche.slice(0, 3).forEach((t, i) => {
     const strich = w.addStack(); strich.size = new Size(0, .7); strich.backgroundColor = LINIE; strich.addSpacer();
-    w.addSpacer(4);
-    const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 46);
+    w.addSpacer(3);
+    const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 42);
     const a = z.addStack(); a.layoutVertically(); a.size = new Size(86, 0);
     text(a, TAGNAME[i] || t.tag, Font.boldSystemFont(19), WEISS, { zeilen: 1, skala: .7 });
     text(a, `${t.datum.slice(8, 10)}.${t.datum.slice(5, 7)}.`, Font.mediumSystemFont(14), SOFT);
@@ -287,7 +309,7 @@ if (!d) {
     info(e, "wind", `Böen ${t.boe} km/h`, t.boe >= 60 ? farbe("#ff9f43") : t.boe >= 40 ? farbe("#ffd24d") : SOFT);
     info(e, "drop.fill", t.regen >= .1 ? `${de(t.regen)} mm` : "trocken", t.regen >= .1 ? BLAU : SOFT);
     info(e, "sun.max.fill", `${de(t.sonne_h)} h Sonne`, t.sonne_h >= 1 ? farbe("#ffd866") : SOFT);
-    w.addSpacer(4);
+    w.addSpacer(3);
   });
   w.addSpacer();
 }
