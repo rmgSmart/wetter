@@ -148,6 +148,13 @@ function mond(dc, x, y, r) {
   p.addCurve(new Point(x + .2 * r, y - r), new Point(x - .45 * r, y + .7 * r), new Point(x - .45 * r, y - .7 * r));
   dc.addPath(p); dc.setFillColor(farbe("#ffe38a")); dc.fillPath();
 }
+// Symbol einmal in eigenes Bild zeichnen, dann beliebig gross einsetzen
+const SYMBILD = {};
+function symbolBild(sym, nacht) {
+  const key = sym + (nacht ? "n" : "t");
+  if (!SYMBILD[key]) { const d2 = new DrawContext(); d2.size = new Size(32, 32); d2.opaque = false; d2.respectScreenScale = true; zeichneSymbol(d2, sym, nacht, 16, 16); SYMBILD[key] = d2.getImage(); }
+  return SYMBILD[key];
+}
 function zeichneSymbol(dc, sym, nacht, x, y) {      // Symbol etwa 26 Punkte breit, Mitte x, y
   const W1 = farbe("#f3f6fb"), W2 = farbe("#c6d0dc");
   const himmel = (dx, dy, r) => nacht ? mond(dc, x + dx, y + dy, r) : sonne(dc, x + dx, y + dy, r);
@@ -190,7 +197,7 @@ function verlauf(alle, W, H) {
   let st = alle;
   // Gleich breite Spalten alle 3 Stunden, symmetrisch ueber die ganze Breite; die Kurve nutzt dieselbe Einteilung
   const SP = 3, n = Math.min(8, Math.floor((st.length - 1) / SP) + 1), zelle = W / n, x = i => zelle * (i / SP + .5), schritt = zelle / SP;
-  const yZeit = 1, ySym = 29, yTxt = 39, yT0 = 56, yT1 = 66, yBoe = H - 14;
+  const yZeit = 1, ySym = 34, yTxt = 44, yT0 = 63, yT1 = 72, yBoe = H - 15;
   const dc = new DrawContext(); dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
   // ruhiger Hintergrund
   dc.setFillColor(farbe("#ffffff", .1)); dc.fillRect(new Rect(0, 0, W, H));
@@ -213,14 +220,14 @@ function verlauf(alle, W, H) {
   zeig.forEach(i => {
     const s = st[i], h = +s.zeit.slice(11, 13), cx = x(i);
     dc.setTextAlignedCenter();
-    dc.setFont(Font.semiboldSystemFont(11)); dc.setTextColor(SOFT); dc.drawTextInRect(i === 0 ? "Jetzt" : String(h), new Rect(cx - 18, yZeit, 36, 14));
-    zeichneSymbol(dc, s.symbol, s.nacht, cx, ySym - 4);
-    dc.setFont(Font.semiboldRoundedSystemFont(14)); dc.setTextColor(WEISS); dc.drawTextInRect(grad(s.temp), new Rect(cx - 18, yTxt, 36, 17));
+    dc.setFont(Font.semiboldSystemFont(12.5)); dc.setTextColor(SOFT); dc.drawTextInRect(i === 0 ? "Jetzt" : String(h), new Rect(cx - 20, yZeit, 40, 16));
+    const k = 1.15; dc.drawImageInRect(symbolBild(s.symbol, s.nacht), new Rect(cx - 16 * k, ySym - 4 - 16 * k, 32 * k, 32 * k));
+    dc.setFont(Font.semiboldRoundedSystemFont(16)); dc.setTextColor(WEISS); dc.drawTextInRect(grad(s.temp), new Rect(cx - 20, yTxt, 40, 19));
     kreis(dc, cx, P[i][1], 2.2, tempFarbe(s.temp));
     const bf = BOEFARBE(s.boe), c = bf ? farbe(bf) : farbe("#ffffff", .62);
-    pfeil(dc, cx - 8, yBoe + 6.5, s.richtung || 0, c);
-    dc.setFont(bf ? Font.boldSystemFont(11) : Font.mediumSystemFont(11)); dc.setTextColor(c); dc.setTextAlignedLeft();
-    dc.drawTextInRect(String(s.boe), new Rect(cx - 2, yBoe, 24, 13));
+    pfeil(dc, cx - 8, yBoe + 7, s.richtung || 0, c);
+    dc.setFont(bf ? Font.boldSystemFont(12.5) : Font.mediumSystemFont(12.5)); dc.setTextColor(c); dc.setTextAlignedLeft();
+    dc.drawTextInRect(String(s.boe), new Rect(cx - 1, yBoe - 1, 26, 15));
   });
   return dc.getImage();
 }
@@ -229,7 +236,8 @@ function verlauf(alle, W, H) {
 const w = new ListWidget();
 w.url = BASIS;
 w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
-w.setPadding(14, 16, 10, 16);
+w.setPadding(12, 16, 8, 16);
+w.spacing = 0;
 
 if (!d) {
   w.backgroundColor = farbe("#16263a");
@@ -267,13 +275,14 @@ if (!d) {
   w.addSpacer(3);
   // Den Satz zur Temperatur weglassen, die steht ohnehin in den Kaestchen. So passt der Rest in zwei Zeilen.
   const satz = (h.satz || "").split(/(?<=\.)\s+/).filter(x => !/^(Höchstwert|Die Temperatur|Bis Mitternacht)/i.test(x)).join(" ");
-  text(w, satz, Font.systemFont(13), SOFT, { zeilen: 2, skala: .75 });
+  const satzS = w.addStack(); satzS.size = new Size(0, 34); satzS.layoutVertically();      // feste Hoehe: zwei Zeilen sind immer sicher
+  text(satzS, satz, Font.systemFont(13.5), SOFT, { zeilen: 2, skala: .8 });
   w.addSpacer(5);
 
   // Die naechsten 24 Stunden als Grafik wie in der App
   const ab = Date.now() - 30 * 60000, st = (d.stunden || []).filter(x => new Date(x.zeit).getTime() >= ab).slice(0, 25);
   if (st.length > 3) {
-    const breit = inhaltBreite() + 8, hoch = 85;
+    const breit = inhaltBreite() + 8, hoch = 92;
     const gs = w.addStack(); gs.size = new Size(0, hoch); gs.cornerRadius = 14;    // volle Breite, das Bild fuellt den Rahmen
     gs.backgroundImage = verlauf(st, breit, hoch); gs.addSpacer();
     w.addSpacer(3);
@@ -289,7 +298,7 @@ if (!d) {
     text(a, TAGNAME[i] || t.tag, Font.boldSystemFont(19), WEISS, { zeilen: 1, skala: .7 });
     text(a, `${t.datum.slice(8, 10)}.${t.datum.slice(5, 7)}.`, Font.mediumSystemFont(14), SOFT);
     const b = z.addStack(); b.layoutVertically(); b.size = new Size(54, 0); b.centerAlignContent();
-    const bs = b.addStack(); bs.addSpacer(); symbol(bs, t.symbol, false, 27); bs.addSpacer();
+    const bs = b.addStack(); bs.addSpacer(); symbol(bs, t.symbol, false, 29); bs.addSpacer();
     if (t.regen_prozent != null && t.regen_prozent >= 10) { const bp = b.addStack(); bp.addSpacer(); text(bp, t.regen_prozent + " %", Font.semiboldSystemFont(13), BLAU); bp.addSpacer(); }
     z.addSpacer(8);
     const c = z.addStack(); c.layoutVertically(); c.spacing = 2;
@@ -301,7 +310,6 @@ if (!d) {
     info(e, "sun.max.fill", `${de(t.sonne_h)} h Sonne`, t.sonne_h >= 1 ? farbe("#ffd866") : SOFT);
     w.addSpacer(3);
   });
-  w.addSpacer();
 }
 
 if (config.runsInWidget) Script.setWidget(w);
