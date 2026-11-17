@@ -124,8 +124,8 @@ function tempBox(stack, t) {
 
 
 /* ---------- 24-Stunden-Grafik ---------- */
-function verlauf(st) {
-  const W = 306, H = 66, X0 = 14, X1 = W - 14, schritt = (X1 - X0) / (st.length - 1);
+function verlauf(st, W) {
+  const H = 66, X0 = 14, X1 = W - 14, schritt = (X1 - X0) / (st.length - 1);
   const yT0 = 16, yT1 = 35, basis = 51, regenH = 12;
   const dc = new DrawContext(); dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
   const x = i => X0 + i * schritt;
@@ -162,7 +162,7 @@ function verlauf(st) {
   dc.setFont(Font.semiboldSystemFont(11)); dc.setTextColor(SOFT); dc.setTextAlignedCenter();
   st.forEach((s, i) => {
     const h = +s.zeit.slice(11, 13);
-    if (i === 0 || (h % 3 === 0 && i > 1 && i < st.length - 1)) dc.drawTextInRect(i === 0 ? "Jetzt" : String(h), new Rect(Math.max(0, x(i) - 18), basis + 3, 36, 14));
+    if (i === 0 || (h % 3 === 0 && i * schritt >= 40 && i < st.length - 1)) dc.drawTextInRect(i === 0 ? "Jetzt" : String(h), new Rect(Math.max(0, x(i) - 18), basis + 3, 36, 14));
   });
   return dc.getImage();
 }
@@ -171,7 +171,7 @@ function verlauf(st) {
 const w = new ListWidget();
 w.url = BASIS;
 w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
-w.setPadding(14, 16, 12, 16);
+w.setPadding(14, 16, 10, 16);
 
 if (!d) {
   w.backgroundColor = farbe("#16263a");
@@ -213,7 +213,10 @@ if (!d) {
   // Die naechsten 24 Stunden als Grafik: Temperaturkurve, Regenbalken, Nacht dunkler
   const ab = Date.now() - 30 * 60000, st = (d.stunden || []).filter(x => new Date(x.zeit).getTime() >= ab).slice(0, 25);
   if (st.length > 3) {
-    w.addImage(verlauf(st)).imageSize = new Size(306, 66);
+    // Breite des grossen Widgets je nach iPhone, abzueglich Rand. Feste Groesse, damit iOS die Grafik nicht verkleinert.
+    let breit = 306; try { breit = Device.screenSize().width >= 428 ? 332 : 306; } catch (e) {}
+    const gs = w.addStack(); gs.size = new Size(breit, 66);
+    gs.addImage(verlauf(st, breit)).imageSize = new Size(breit, 66);
     w.addSpacer(4);
   }
 
