@@ -379,8 +379,8 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611170829"></script>
-<script src="gigio.js?v=202611170829"></script>
+<script src="daten.js?v=202611170834"></script>
+<script src="gigio.js?v=202611170834"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -606,7 +606,9 @@ const TINT = { klar: ["255,196,60", .42], heiter: ["255,208,96", .34], wolkig: [
 function tagesfarbe(w) {
   if (w.symbol === "gewitter") return TINT.gewitter;
   if (w.symbol === "schnee" && w.regen >= .3) return TINT.schnee;
-  if (w.regen >= .5) { const k = Math.min(1, w.regen / 10); return ["64,146,255", +(.2 + .35 * k).toFixed(2)]; }
+  // Regen zaehlt nur, wenn er auch wahrscheinlich ist: Menge mal Wahrscheinlichkeit
+  const p = w.regen_prozent != null ? w.regen_prozent / 100 : 1, erwartet = w.regen * p;
+  if (p >= .4 && erwartet >= .5) { const k = Math.min(1, erwartet / 6); return ["64,146,255", +(.2 + .35 * k).toFixed(2)]; }
   const mi = t => +t.slice(0, 2) * 60 + +t.slice(3, 5), licht = Math.max(1, (mi(w.sonnenuntergang) - mi(w.sonnenaufgang)) / 60);
   const anteil = Math.min(1, (w.sonne_h || 0) / licht);
   if (anteil >= .25) return ["255,196,60", +(.12 + .36 * anteil).toFixed(2)];
@@ -840,7 +842,7 @@ setInterval(load, 10 * 60 * 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - zuletzt > 5 * 60 * 1000) load(); });
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611170829";
+const VERSION = "202611170834";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
