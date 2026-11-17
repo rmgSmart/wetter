@@ -188,27 +188,15 @@ function stundenTon(s) {
 }
 function verlauf(st, W, H) {
   const X0 = 20, X1 = W - 20, schritt = (X1 - X0) / (st.length - 1), x = i => X0 + i * schritt;
-  const yZeit = 2, ySym = 29, yT0 = 47, yT1 = 60, yBoe = H - 15;
+  const yZeit = 1, ySym = 30, yTxt = 41, yT0 = 59, yT1 = 70, yBoe = H - 14;
   const dc = new DrawContext(); dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
   // Hintergrund, Nacht dunkler
-  dc.setFillColor(farbe("#ffffff", .06)); dc.fillRect(new Rect(0, 0, W, H));
+  dc.setFillColor(farbe("#ffffff", .1)); dc.fillRect(new Rect(0, 0, W, H));
   // Jede Stunde wie in der App getoent: Regen blau, klare Nacht dunkelblau, Sonne gelb, sonst grau. Nach unten blasser.
-  // Gleiche Toene nebeneinander zu einem Block zusammenfassen, sonst entstehen feine Linien
-  const toene = st.map(s => { const [rgb, a] = stundenTon(s); return rgb + "|" + a.toFixed(2); });
-  for (let i = 0; i < st.length;) {
-    let j = i; while (j + 1 < st.length && toene[j + 1] === toene[i]) j++;
-    const [rgb, as] = toene[i].split("|"), a = +as, hex = "#" + rgb.split(",").map(v => (+v).toString(16).padStart(2, "0")).join("");
-    const l = i === 0 ? 0 : Math.round(x(i) - schritt / 2), r = j === st.length - 1 ? W : Math.round(x(j) + schritt / 2);
-    // Verlauf nach unten blasser: Grundfarbe ueber die ganze Hoehe, darueber nach oben hin weitere Lagen
-    dc.setFillColor(farbe(hex, a * .3)); dc.fillRect(new Rect(l, 0, r - l, H));
-    const lagen = 6;
-    for (let k = 1; k <= lagen; k++) { dc.setFillColor(farbe(hex, a * .7 / lagen)); dc.fillRect(new Rect(l, 0, r - l, Math.round(H * (1 - k / (lagen + 1))))); }
-    i = j + 1;
-  }
   // Welche Stunden beschriftet werden: jetzt und dann alle 3 Stunden, mit Mindestabstand
   const zeig = []; st.forEach((s, i) => { const h = +s.zeit.slice(11, 13); if (i === 0 || (h % 3 === 0 && x(i) - x(zeig[zeig.length - 1]) >= 30 && x(i) <= X1 - 4)) zeig.push(i); });
   // Regen ganz dezent unter der Kurve
-  st.forEach((s, i) => { if (s.regen < .05) return; const h = Math.max(1.5, Math.min(1, s.regen / 3) * 10); dc.setFillColor(farbe("#6cc4ff", .55)); dc.fillRect(new Rect(x(i) - schritt * .35, yT1 + 12 - h, schritt * .7, h)); });
+  st.forEach((s, i) => { if (s.regen < .05) return; const h = Math.max(1.5, Math.min(1, s.regen / 3) * 9); dc.setFillColor(farbe("#6cc4ff", .5)); dc.fillRect(new Rect(x(i) - schritt * .35, yT1 + 4 - h, schritt * .7, h)); });
   // Temperaturkurve, weich
   const t = st.map(s => s.temp), lo = Math.min(...t), hi = Math.max(...t), sp = Math.max(hi - lo, 3), mitte = (lo + hi) / 2;
   const y = v => (yT0 + yT1) / 2 - (v - mitte) / sp * (yT1 - yT0);
@@ -217,16 +205,16 @@ function verlauf(st, W, H) {
     const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
     const p = new Path(); p.move(new Point(p1[0], p1[1]));
     p.addCurve(new Point(p2[0], p2[1]), new Point(p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6), new Point(p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6));
-    dc.addPath(p); dc.setStrokeColor(tempFarbe((t[i] + t[i + 1]) / 2)); dc.setLineWidth(2.6); dc.strokePath();
+    dc.addPath(p); dc.setStrokeColor(tempFarbe((t[i] + t[i + 1]) / 2)); dc.setLineWidth(2.2); dc.strokePath();
   }
-  kreis(dc, P[0][0], P[0][1], 3.2, WEISS);
   // Spalten: Uhrzeit, Symbol, Temperatur, Boeen
   zeig.forEach(i => {
     const s = st[i], h = +s.zeit.slice(11, 13), cx = x(i);
     dc.setTextAlignedCenter();
     dc.setFont(Font.semiboldSystemFont(11)); dc.setTextColor(SOFT); dc.drawTextInRect(i === 0 ? "Jetzt" : String(h), new Rect(cx - 18, yZeit, 36, 14));
     zeichneSymbol(dc, s.symbol, s.nacht, cx, ySym - 4);
-    dc.setFont(Font.semiboldRoundedSystemFont(14)); dc.setTextColor(WEISS); dc.drawTextInRect(grad(s.temp), new Rect(cx - 18, P[i][1] - 20, 36, 17));
+    dc.setFont(Font.semiboldRoundedSystemFont(14)); dc.setTextColor(WEISS); dc.drawTextInRect(grad(s.temp), new Rect(cx - 18, yTxt, 36, 17));
+    kreis(dc, cx, P[i][1], 2.2, tempFarbe(s.temp));
     const bf = BOEFARBE(s.boe), c = bf ? farbe(bf) : farbe("#ffffff", .62);
     pfeil(dc, cx - 8, yBoe + 6.5, s.richtung || 0, c);
     dc.setFont(bf ? Font.boldSystemFont(11) : Font.mediumSystemFont(11)); dc.setTextColor(c); dc.setTextAlignedLeft();
