@@ -75,10 +75,19 @@ const Wetter = (() => {
 
   /* ---------- Standort ---------- */
   // Fehlercodes: 0 nicht unterstuetzt, 1 abgelehnt, 2 nicht verfuegbar, 3 Zeitueberschreitung
+  // iOS ruft bei Apps am Home-Bildschirm die Standortabfrage manchmal nie zurueck.
+  // Deshalb eine eigene harte Zeitgrenze, danach gilt der zuletzt bekannte Standort.
   function standort() {
+    const letzte = () => { try { const p = JSON.parse(localStorage.getItem("pos")); if (p && p.lat != null) return { lat: p.lat, lon: p.lon, alt: true }; } catch (e) {} return null; };
     return new Promise(res => {
-      if (!navigator.geolocation || !window.isSecureContext) return res({ fehler: 0 });
-      navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lon: p.coords.longitude }), e => res({ fehler: e.code }),
+      let fertig = false; const ende = r => { if (!fertig) { fertig = true; clearTimeout(t); res(r); } };
+      const t = setTimeout(() => ende({ ...(letzte() || {}), fehler: 3 }), 10000);
+      if (!navigator.geolocation || !window.isSecureContext) return ende(letzte() || { fehler: 0 });
+      navigator.geolocation.getCurrentPosition(p => {
+        const r = { lat: p.coords.latitude, lon: p.coords.longitude };
+        try { localStorage.setItem("pos", JSON.stringify(r)); } catch (e) {}
+        ende(r);
+      }, e => { const l = letzte(); ende(l ? { ...l, fehler: e.code } : { fehler: e.code }); },
         { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 });
     });
   }
@@ -333,7 +342,7 @@ const Wetter = (() => {
     if (!stunden.length) throw new Error("Keine Wetterdaten erreichbar");
     const ort = await ortP;
     const d = baue(stunden, om?.daily || null, new Date(), ort, lat, lon, quellen, lauf, nc);
-    d.standortFrei = !!pos; d.standortFehler = pos ? null : st.fehler; d.gewaehlt = !!wahl;
+    d.standortFrei = !!pos && !st.alt; d.standortAlt = !!st.alt; d.standortFehler = d.standortFrei ? null : st.fehler; d.gewaehlt = !!wahl;
     const uvTage = {}; (om?.daily?.time || []).forEach((t, i) => { const u = om.daily.uv_index_max?.[i]; if (u != null) uvTage[t] = Math.round(u); });
     d.woche.forEach(w => { w.uv = uvTage[w.datum] ?? null; w.uv_text = uvText(w.uv); w.luft = null; });
     const uvJ = om?.current?.uv_index, uvM = om?.daily?.uv_index_max?.[0];

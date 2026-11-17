@@ -246,6 +246,7 @@ html.wechsel main > *:not(.hero), html.wechsel .hero > *:not(.loc) { opacity: .2
 .hero .loc:active { transform: scale(.97); opacity: .85; }
 .hero .loc svg { width: 14px; height: 14px; flex: none; }
 .hero .loc .alter { font-weight: 400; color: var(--soft); }
+html.veraltet .hero .loc .alter { color: #ffb340; font-weight: 600; }
 html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin: 0 auto; width: -webkit-fit-content; width: fit-content; }
 .hero .loc { white-space: nowrap; max-width: 100%; overflow: hidden; }
 .mess { font-size: 12.5px; color: var(--soft); margin-top: 6px; text-wrap: balance; }
@@ -378,8 +379,8 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611170805"></script>
-<script src="gigio.js?v=202611170805"></script>
+<script src="daten.js?v=202611170812"></script>
+<script src="gigio.js?v=202611170812"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -507,7 +508,7 @@ function cardRegen(d) {
   const view = hatNc ? (regenView || (n.regnet ? "3h" : "24h")) : "24h";
   const h = d.heute;
   const zusatz = `<div class="tiles">
-      <div class="tile"><div class="k">Niederschlagsart</div><div class="v klein">${h.arten_24h && h.arten_24h.length ? h.arten_24h.join(", dann ") : "keiner"}</div></div></div>`;
+      ${h.arten_24h && h.arten_24h.length ? `<div class="tile"><div class="k">Niederschlagsart</div><div class="v klein">${h.arten_24h.join(", dann ")}</div></div>` : ""}</div>`;
   const seg = hatNc ? `<div class="seg" role="group" aria-label="Zeitraum">
       <button type="button" data-rv="3h" aria-pressed="${view === "3h"}">3 Std</button><button type="button" data-rv="24h" aria-pressed="${view === "24h"}">24 Std</button></div>` : "";
   const kopf = lead => `<div class="head"><h2>Niederschlag</h2>${seg}</div><p class="lead">${lead}</p>`;
@@ -659,14 +660,13 @@ function render() {
   zeigeAlter();
   const GRUND = { 0: "Dieser Browser gibt keinen Standort heraus.", 1: "Der Standort wurde nicht freigegeben.", 2: "Der Standort ist gerade nicht verfügbar.", 3: "Die Standortabfrage hat zu lange gedauert." };
   $("standortHilfe").innerHTML = d.standortFrei || d.gewaehlt ? "" : `<button type="button" class="standort" id="standortBtn">Meinen Standort verwenden</button>
-    <p class="hinweis">${GRUND[d.standortFehler] ?? GRUND[1]} Gezeigt wird 1010 Wien.${d.standortFehler === 1 ? " Am iPhone unter Settings > Privacy & Security > Location Services > Safari Websites auf \"While Using the App\" stellen." : ""}</p>`;
+    <p class="hinweis">${GRUND[d.standortFehler] ?? GRUND[1]} ${d.standortAlt ? "Gezeigt wird der zuletzt bekannte Standort." : "Gezeigt wird 1010 Wien."}${d.standortFehler === 1 ? " Am iPhone unter Settings > Privacy & Security > Location Services > Safari Websites auf \"While Using the App\" stellen." : ""}</p>`;
   const sb = $("standortBtn"); if (sb) sb.onclick = () => {
     sb.disabled = true; sb.textContent = "Standort wird abgefragt …";
-    navigator.geolocation?.getCurrentPosition(() => { zuletzt = 0; load(); }, () => { sb.disabled = false; sb.textContent = "Meinen Standort verwenden"; }, { timeout: 15000 });
+    navigator.geolocation?.getCurrentPosition(() => { zuletzt = 0; load(true); }, () => { sb.disabled = false; sb.textContent = "Meinen Standort verwenden"; }, { timeout: 15000 });
   };
   const veraltet = !DEMO && alt > 45;
-  $("stale").hidden = !veraltet;
-  $("stale").textContent = veraltet ? `Daten nicht aktuell, Stand ${d.stand.slice(11, 16)} Uhr` : "";
+  $("stale").hidden = true; document.documentElement.classList.toggle("veraltet", !!veraltet);
   const mess = d.messung && Date.now() - new Date(d.messung.zeit).getTime() < 60 * 60000 ? d.messung : null;
   $("temp").innerHTML = `${Math.round(mess ? mess.temp : d.jetzt.temp)}<sup id="deg">°</sup>`;
   $("mess").textContent = mess ? `Nächste Messstation: ${mess.station}, ${de(mess.km)} km entfernt, ${mess.zeit.slice(11, 16)} Uhr` : "";
@@ -713,6 +713,7 @@ function zeigeAlter() {
   if (WECHSEL) { $("loc").innerHTML = `${NADEL}${WECHSEL}<span class="alter">· wird geladen …</span>`; return; }
   if (!DATA) return;
   const min = Math.max(0, Math.round((Date.now() - new Date(DATA.stand).getTime()) / 60000));
+  document.documentElement.classList.toggle("veraltet", !DEMO && min > 45);
   const alter = min < 1 ? "gerade aktualisiert" : min < 60 ? `vor ${min} min aktualisiert` : `vor ${Math.round(min / 60)} h aktualisiert`;
   $("loc").innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-10.4a6.5 6.5 0 0 1 13 0C18.500 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg>${DATA.ort}<span class="alter">· ${alter}</span><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
@@ -727,7 +728,7 @@ async function load(neuStart = false) {
   if (laedt && !neuStart) return;
   laedt = true; const nr = ++ladeNr, wahl = ORTWAHL;
   let neu = null;
-  try { neu = await Wetter.laden(wahl); } catch (e) {}
+  try { neu = await Promise.race([Wetter.laden(wahl), new Promise((_, nein) => setTimeout(() => nein(new Error("zeit")), 40000))]); } catch (e) {}
   if (nr !== ladeNr) return;                           // inzwischen wurde ein anderer Ort gewaehlt
   laedt = false;
   const merke = () => { schreibe("letzte", DATA); schreibe(ortKey(wahl), DATA); };
@@ -839,7 +840,7 @@ setInterval(load, 10 * 60 * 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - zuletzt > 5 * 60 * 1000) load(); });
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611170805";
+const VERSION = "202611170812";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
@@ -870,7 +871,7 @@ async function aktualisieren() {
   if (ptrLaeuft) return; ptrLaeuft = true;
   ptr.classList.remove("bereit"); ptr.classList.add("laeuft");
   ptr.style.transition = "transform .25s ease"; ptr.style.opacity = 1; ptr.style.transform = "translate3d(0,6px,0)";
-  const fertig = (async () => { pruefeVersion(); if (!laedt) await load(); })();
+  const fertig = (async () => { pruefeVersion(); await load(true); })();
   await Promise.race([fertig, new Promise(r => setTimeout(r, 9000))]);      // nie laenger als 9 s haengen
   await new Promise(r => setTimeout(r, 400));
   ptrWeg();
