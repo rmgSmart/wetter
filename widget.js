@@ -153,9 +153,10 @@ function verlauf(st) {
   if (iMin > 2 && Math.abs(iMin - iMax) > 3) marken.push([iMin, 1]);
   marken.forEach(([i, lage]) => {
     const p = new Path(); p.addEllipse(new Rect(x(i) - 3, y(t[i]) - 3, 6, 6)); dc.addPath(p); dc.setFillColor(WEISS); dc.fillPath();
+    const ty = lage < 0 ? y(t[i]) - 17 : y(t[i]) + 4, tx = Math.min(W - 34, Math.max(0, x(i) - 17));
+    if (lage > 0) { const hg = new Path(); hg.addRoundedRect(new Rect(tx + 5, ty, 24, 15), 6, 6); dc.addPath(hg); dc.setFillColor(farbe("#0b1622", .55)); dc.fillPath(); }
     dc.setTextColor(WEISS); dc.setTextAlignedCenter();
-    const ty = lage < 0 ? y(t[i]) - 17 : y(t[i]) + 3;
-    dc.drawTextInRect(grad(t[i]), new Rect(Math.min(W - 34, Math.max(0, x(i) - 17)), ty, 34, 15));
+    dc.drawTextInRect(grad(t[i]), new Rect(tx, ty, 34, 15));
   });
   // Uhrzeiten
   dc.setFont(Font.semiboldSystemFont(11)); dc.setTextColor(SOFT); dc.setTextAlignedCenter();
