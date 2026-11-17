@@ -222,7 +222,7 @@ const Wetter = (() => {
     return wolken < 30 ? "sonnig" : wolken < 75 ? "heiter" : "bewoelkt";
   }
   const arten = st => [...new Set(st.map(s => s.art).filter(Boolean))];
-  function satz(jetzt, rest, fenster, tmax, boe) {
+  function satz(jetzt, rest, fenster, tmax, boe, t24 = []) {
     const teile = [], heute = tag(jetzt), stunde = d => `${d.getHours()} Uhr`;
     const fh = fenster.filter(f => f.von.slice(0, 10) <= heute && new Date(f.bis) > jetzt);
     if (fh.length) {
@@ -240,6 +240,12 @@ const Wetter = (() => {
       const grenze = Math.max(40, boe * .8), stark = rest.filter(x => x.boe >= grenze);
       const h0 = +stark[0].zeit.slice(11, 13), h1 = +stark[stark.length - 1].zeit.slice(11, 13);
       teile.push(stark.length >= rest.length - 1 ? `Böen bis ${boe} km/h` : h0 === h1 ? `Böen bis ${boe} km/h um ${h0} Uhr` : `Böen bis ${boe} km/h zwischen ${h0} und ${h1} Uhr`);
+    }
+    // Sturmboeen nach Mitternacht, aber innerhalb der naechsten 24 Stunden, auch erwaehnen
+    const spaeter = t24.filter(x => tag(new Date(x.zeit)) !== tag(jetzt)), sp = spaeter.reduce((a, x) => x.boe > (a ? a.boe : -1) ? x : a, null);
+    if (sp && sp.boe >= 60 && sp.boe > boe) {
+      const h = +sp.zeit.slice(11, 13), wann = h < 5 ? "In der Nacht" : h < 11 ? "Morgen früh" : h < 14 ? "Morgen Mittag" : h < 18 ? "Morgen Nachmittag" : "Morgen Abend";
+      teile.push(`${wann} um ${h} Uhr ${sp.boe >= 75 ? "Sturmböen" : "kräftige Böen"} bis ${sp.boe} km/h`);
     }
     if (rest.length) {
       const tief = Math.min(...rest.map(s => s.temp));
@@ -310,7 +316,7 @@ const Wetter = (() => {
     return {
       ort, koordinaten: [lat, lon], stand: iso(jetzt), modelllauf: lauf, charakter: charakter(rest, t0.max), nacht: !(auf <= jetzt && jetzt <= unter), jetzt: aktuell,
       heute: { min: t0.min, max: t0.max, regen_rest: r1(rest.reduce((a, s) => a + s.regen, 0)), regenrisiko: stufen.length ? stufen.reduce((a, c) => ord.indexOf(c) > ord.indexOf(a) ? c : a) : null,
-               regenfenster: fenster, boe_max: boeRest, sonne_h: t0.sonne_h, sonnenaufgang: uhr(auf), sonnenuntergang: uhr(unter), satz: satz(jetzt, rest, fenster, t0.max, boeRest),
+               regenfenster: fenster, boe_max: boeRest, sonne_h: t0.sonne_h, sonnenaufgang: uhr(auf), sonnenuntergang: uhr(unter), satz: satz(jetzt, rest, fenster, t0.max, boeRest, kommend.slice(0, 24)),
                drucktrend: trend, arten_24h: arten(t24), schneefallgrenze_24h: gr.length ? [Math.min(...gr), Math.max(...gr)] : null },
       nowcast: nc, stunden: kommend, woche, quellen: [...new Set([...quellen, ...(omDaily ? ["Open-Meteo (CC BY 4.0)"] : [])])],
     };
