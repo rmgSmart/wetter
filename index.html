@@ -248,7 +248,7 @@ html.wechsel main > *:not(.hero), html.wechsel .hero > *:not(.loc) { opacity: .2
 .hero .loc .alter { font-weight: 400; color: var(--soft); }
 html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin: 0 auto; width: -webkit-fit-content; width: fit-content; }
 .hero .loc { white-space: nowrap; max-width: 100%; overflow: hidden; }
-.mess { font-size: 12.5px; color: var(--soft); margin-top: 6px; }
+.mess { font-size: 12.5px; color: var(--soft); margin-top: 6px; text-wrap: balance; }
 #orte { position: fixed; inset: 0; z-index: 70; background: rgba(4,10,18,.55); display: flex; align-items: flex-end; justify-content: center; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 #orte[hidden] { display: none; }
 #orte .blatt { width: 100%; max-width: 460px; max-height: 86vh; overflow-y: auto; background: #18273a; color: #fff; border-radius: 26px 26px 0 0; padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 18px); box-shadow: 0 -10px 40px rgba(0,0,0,.4); }
@@ -378,8 +378,8 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611161739"></script>
-<script src="gigio.js?v=202611161739"></script>
+<script src="daten.js?v=202611170805"></script>
+<script src="gigio.js?v=202611170805"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -592,7 +592,7 @@ function cardDetails(d) {
   if (!d.nacht && j.strahlung != null) t.push(tile("Sonnenstrahlung", j.strahlung, "W/m²"));
   if (j.schneefallgrenze != null && j.schneefallgrenze < 1200) t.push(tile("Schneefallgrenze", j.schneefallgrenze, "m"));
   if (cape && j.cape >= 100) t.push(tile("Gewitter", `<span class="klein">${cape}</span>`));
-  const kopf = m ? `<p class="messkopf">Messwerte von ${m.station}, ${de(m.km)} km entfernt, ${m.zeit.slice(11, 16)} Uhr</p>` : "";
+  const kopf = m ? `<p class="messkopf">Messwerte der nächsten Station: ${m.station}, ${de(m.km)} km entfernt, ${m.zeit.slice(11, 16)} Uhr</p>` : "";
   const pollen = d.pollen && d.pollen.length ? `<p class="pollen">Pollen heute: ${d.pollen.map(p => `<b>${p.name}</b> ${p.stufe}`).join(", ")}</p>` : "";
   return `<section class="card"><h2>Heute im Detail</h2>${kopf}<div class="tiles">${t.join("")}</div>${pollen}</section>`;
 }
@@ -669,7 +669,7 @@ function render() {
   $("stale").textContent = veraltet ? `Daten nicht aktuell, Stand ${d.stand.slice(11, 16)} Uhr` : "";
   const mess = d.messung && Date.now() - new Date(d.messung.zeit).getTime() < 60 * 60000 ? d.messung : null;
   $("temp").innerHTML = `${Math.round(mess ? mess.temp : d.jetzt.temp)}<sup id="deg">°</sup>`;
-  $("mess").textContent = mess ? `Gemessen um ${mess.zeit.slice(11, 16)} Uhr, ${mess.station}` : "";
+  $("mess").textContent = mess ? `Nächste Messstation: ${mess.station}, ${de(mess.km)} km entfernt, ${mess.zeit.slice(11, 16)} Uhr` : "";
   document.documentElement.classList.remove("leer"); $("splash").classList.add("weg");
   const naechste = d.stunden.slice(0, 12), nass = naechste.find(s => s.regen >= 0.1);
   $("icon").innerHTML = icon(nass ? nass.symbol : d.jetzt.symbol, nass ? nass.nacht : d.nacht);
@@ -839,7 +839,7 @@ setInterval(load, 10 * 60 * 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - zuletzt > 5 * 60 * 1000) load(); });
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611161739";
+const VERSION = "202611170805";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
