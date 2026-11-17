@@ -45,6 +45,7 @@ async function holeCode(name) {
   return fm.fileExists(pfad) ? fm.readString(pfad) : null;
 }
 
+const nurUpdate = !config.runsInWidget && args.queryParameters && args.queryParameters.update === "1";
 let d = null, veraltet = false;
 try {
   const code = await holeCode("daten.js");
@@ -115,10 +116,10 @@ function info(stack, sf, wert, farbeSym) {
   const s = SFSymbol.named(sf); s.applyFont(Font.systemFont(11));
   const i = z.addImage(s.image); i.imageSize = new Size(13, 13); i.tintColor = farbeSym || SOFT;
   z.addSpacer(5);
-  text(z, wert, Font.mediumSystemFont(13), WEISS, { zeilen: 1, skala: .7 });
+  text(z, wert, Font.mediumSystemFont(12.5), WEISS, { zeilen: 1, skala: .7 });
 }
 function tempBox(stack, t) {
-  const b = stack.addStack(); b.size = new Size(50, 23); b.cornerRadius = 7; b.backgroundColor = tempFarbe(t); b.centerAlignContent();
+  const b = stack.addStack(); b.size = new Size(50, 21); b.cornerRadius = 7; b.backgroundColor = tempFarbe(t); b.centerAlignContent();
   b.addSpacer(); text(b, grad(t), Font.semiboldRoundedSystemFont(15), farbe("#10202a")); b.addSpacer();
 }
 
@@ -148,7 +149,7 @@ if (!d) {
   text(ortZ, d.ort, Font.semiboldSystemFont(15), WEISS, { zeilen: 1, skala: .7 });
   const tempZ = links.addStack(); tempZ.layoutHorizontally(); tempZ.centerAlignContent();
   const mess = d.messung && Date.now() - new Date(d.messung.zeit).getTime() < 60 * 60000 ? d.messung : null;
-  text(tempZ, grad(mess ? mess.temp : j.temp), Font.lightRoundedSystemFont(46));
+  text(tempZ, grad(mess ? mess.temp : j.temp), Font.lightRoundedSystemFont(40));
   tempZ.addSpacer(8);
   const symS = tempZ.addStack(); symS.layoutVertically();
   symbol(symS, j.symbol, d.nacht, 24);
@@ -159,37 +160,56 @@ if (!d) {
   info(rechts, "sunrise.fill", h.sonnenaufgang, farbe("#ffd866"));
   info(rechts, "sunset.fill", h.sonnenuntergang, farbe("#ffb070"));
   const alter = Math.round((Date.now() - new Date(d.stand).getTime()) / 60000);
-  info(rechts, "clock", alter < 1 ? "gerade" : alter < 60 ? `vor ${alter} min` : `Stand ${d.stand.slice(11, 16)}`, veraltet || alter > 45 ? farbe("#ffb340") : SOFT);
+  const knopf = rechts.addStack(); knopf.layoutHorizontally(); knopf.centerAlignContent();
+  knopf.backgroundColor = farbe("#ffffff", .16); knopf.cornerRadius = 9; knopf.setPadding(3, 7, 3, 8);
+  knopf.url = `scriptable:///run/${encodeURIComponent(Script.name())}?update=1`;
+  info(knopf, "arrow.clockwise", alter < 1 ? "gerade" : alter < 60 ? `vor ${alter} min` : `Stand ${d.stand.slice(11, 16)}`, veraltet || alter > 45 ? farbe("#ffb340") : WEISS);
 
-  w.addSpacer(4);
-  text(w, h.satz || "", Font.systemFont(13), SOFT, { zeilen: 2, skala: .8 });
-  w.addSpacer(8);
+  w.addSpacer(3);
+  text(w, h.satz || "", Font.systemFont(12), SOFT, { zeilen: 2, skala: .8 });
+  w.addSpacer(7);
+
+  // Die naechsten 12 Stunden in 2-Stunden-Schritten
+  const ab = Date.now() - 30 * 60000, st = (d.stunden || []).filter(x => new Date(x.zeit).getTime() >= ab).filter((x, i) => i % 2 === 0).slice(0, 6);
+  if (st.length) {
+    const leiste = w.addStack(); leiste.layoutHorizontally(); leiste.backgroundColor = farbe("#ffffff", .1); leiste.cornerRadius = 12; leiste.setPadding(4, 4, 4, 4);
+    st.forEach((x, i) => {
+      if (i) leiste.addSpacer();
+      const sp = leiste.addStack(); sp.layoutVertically(); sp.size = new Size(44, 0); sp.centerAlignContent();
+      const zeile = (f) => { const r = sp.addStack(); r.addSpacer(); f(r); r.addSpacer(); };
+      zeile(r => text(r, i === 0 ? "Jetzt" : x.zeit.slice(11, 13) + " Uhr", Font.mediumSystemFont(11), SOFT, { zeilen: 1, skala: .8 }));
+      zeile(r => symbol(r, x.symbol, x.nacht, 14));
+      zeile(r => text(r, grad(x.temp), Font.semiboldRoundedSystemFont(14), tempFarbe(x.temp)));
+    });
+    w.addSpacer(5);
+  }
 
   // Heute, Morgen, Uebermorgen
   const TAGNAME = ["Heute", "Morgen"];
   d.woche.slice(0, 3).forEach((t, i) => {
     const strich = w.addStack(); strich.size = new Size(0, .7); strich.backgroundColor = LINIE; strich.addSpacer();
-    w.addSpacer(6);
-    const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 60);
+    w.addSpacer(4);
+    const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 46);
     const a = z.addStack(); a.layoutVertically(); a.size = new Size(84, 0);
-    text(a, TAGNAME[i] || t.tag, Font.boldSystemFont(18), WEISS, { zeilen: 1, skala: .75 });
+    text(a, TAGNAME[i] || t.tag, Font.boldSystemFont(17), WEISS, { zeilen: 1, skala: .75 });
     text(a, `${t.datum.slice(8, 10)}.${t.datum.slice(5, 7)}.`, Font.mediumSystemFont(13), SOFT);
     const b = z.addStack(); b.layoutVertically(); b.size = new Size(52, 0); b.centerAlignContent();
     const bs = b.addStack(); bs.addSpacer(); symbol(bs, t.symbol, false, 24); bs.addSpacer();
     if (t.regen_prozent != null && t.regen_prozent >= 10) { const bp = b.addStack(); bp.addSpacer(); text(bp, t.regen_prozent + " %", Font.semiboldSystemFont(12), BLAU); bp.addSpacer(); }
     z.addSpacer(8);
-    const c = z.addStack(); c.layoutVertically(); c.spacing = 3;
+    const c = z.addStack(); c.layoutVertically(); c.spacing = 2;
     tempBox(c, t.max); tempBox(c, t.min);
     z.addSpacer();
-    const e = z.addStack(); e.layoutVertically(); e.spacing = 2; e.size = new Size(104, 0);
+    const e = z.addStack(); e.layoutVertically(); e.spacing = 1; e.size = new Size(104, 0);
     info(e, "wind", `Böen ${t.boe} km/h`, t.boe >= 60 ? farbe("#ff9f43") : t.boe >= 40 ? farbe("#ffd24d") : SOFT);
     info(e, "drop.fill", t.regen >= .1 ? `${de(t.regen)} mm` : "trocken", t.regen >= .1 ? BLAU : SOFT);
     info(e, "sun.max.fill", `${de(t.sonne_h)} h Sonne`, t.sonne_h >= 1 ? farbe("#ffd866") : SOFT);
-    w.addSpacer(6);
+    w.addSpacer(4);
   });
   w.addSpacer();
 }
 
 if (config.runsInWidget) Script.setWidget(w);
+else if (nurUpdate) { Script.setWidget(w); App.close(); }
 else await w.presentLarge();
 Script.complete();
