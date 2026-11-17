@@ -118,7 +118,7 @@ function info(stack, sf, wert, farbeSym) {
   text(z, wert, Font.mediumSystemFont(13.5), WEISS, { zeilen: 1, skala: .7 });
 }
 function tempBox(stack, t) {
-  const b = stack.addStack(); b.size = new Size(52, 23); b.cornerRadius = 7; b.backgroundColor = tempFarbe(t); b.centerAlignContent();
+  const b = stack.addStack(); b.size = new Size(52, 22); b.cornerRadius = 7; b.backgroundColor = tempFarbe(t); b.centerAlignContent();
   b.addSpacer(); text(b, grad(t), Font.semiboldRoundedSystemFont(17), farbe("#10202a")); b.addSpacer();
 }
 
@@ -190,7 +190,7 @@ function verlauf(alle, W, H) {
   let st = alle;
   // Gleich breite Spalten alle 3 Stunden, symmetrisch ueber die ganze Breite; die Kurve nutzt dieselbe Einteilung
   const SP = 3, n = Math.min(8, Math.floor((st.length - 1) / SP) + 1), zelle = W / n, x = i => zelle * (i / SP + .5), schritt = zelle / SP;
-  const yZeit = 1, ySym = 30, yTxt = 41, yT0 = 59, yT1 = 70, yBoe = H - 14;
+  const yZeit = 1, ySym = 29, yTxt = 39, yT0 = 56, yT1 = 66, yBoe = H - 14;
   const dc = new DrawContext(); dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
   // ruhiger Hintergrund
   dc.setFillColor(farbe("#ffffff", .1)); dc.fillRect(new Rect(0, 0, W, H));
@@ -268,12 +268,12 @@ if (!d) {
   // Den Satz zur Temperatur weglassen, die steht ohnehin in den Kaestchen. So passt der Rest in zwei Zeilen.
   const satz = (h.satz || "").split(/(?<=\.)\s+/).filter(x => !/^(Höchstwert|Die Temperatur|Bis Mitternacht)/i.test(x)).join(" ");
   text(w, satz, Font.systemFont(13), SOFT, { zeilen: 2, skala: .75 });
-  w.addSpacer(7);
+  w.addSpacer(5);
 
   // Die naechsten 24 Stunden als Grafik wie in der App
   const ab = Date.now() - 30 * 60000, st = (d.stunden || []).filter(x => new Date(x.zeit).getTime() >= ab).slice(0, 25);
   if (st.length > 3) {
-    const breit = inhaltBreite() + 12, hoch = 90;
+    const breit = inhaltBreite() + 8, hoch = 85;
     const gs = w.addStack(); gs.size = new Size(0, hoch); gs.cornerRadius = 14;    // volle Breite, das Bild fuellt den Rahmen
     gs.backgroundImage = verlauf(st, breit, hoch); gs.addSpacer();
     w.addSpacer(3);
@@ -284,7 +284,7 @@ if (!d) {
   d.woche.slice(0, 3).forEach((t, i) => {
     const strich = w.addStack(); strich.size = new Size(0, .7); strich.backgroundColor = LINIE; strich.addSpacer();
     w.addSpacer(3);
-    const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 50);
+    const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 47);
     const a = z.addStack(); a.layoutVertically(); a.size = new Size(86, 0);
     text(a, TAGNAME[i] || t.tag, Font.boldSystemFont(19), WEISS, { zeilen: 1, skala: .7 });
     text(a, `${t.datum.slice(8, 10)}.${t.datum.slice(5, 7)}.`, Font.mediumSystemFont(14), SOFT);
