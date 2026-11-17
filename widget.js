@@ -207,7 +207,9 @@ if (!d) {
   info(rechts, "clock", alter < 1 ? "gerade" : alter < 60 ? `vor ${alter} min` : `Stand ${d.stand.slice(11, 16)}`, veraltet || alter > 45 ? farbe("#ffb340") : WEISS);
 
   w.addSpacer(3);
-  text(w, h.satz || "", Font.systemFont(13), SOFT, { zeilen: 2, skala: .85 });
+  // Den Satz zur Temperatur weglassen, die steht ohnehin in den Kaestchen. So passt der Rest in zwei Zeilen.
+  const satz = (h.satz || "").split(/(?<=\.)\s+/).filter(x => !/^(Höchstwert|Die Temperatur|Bis Mitternacht)/i.test(x)).join(" ");
+  text(w, satz, Font.systemFont(13), SOFT, { zeilen: 2, skala: .75 });
   w.addSpacer(7);
 
   // Die naechsten 24 Stunden als Grafik: Temperaturkurve, Regenbalken, Nacht dunkler
@@ -216,7 +218,7 @@ if (!d) {
     // Breite des grossen Widgets je nach iPhone, abzueglich Rand. Feste Groesse, damit iOS die Grafik nicht verkleinert.
     let breit = 306; try { breit = Device.screenSize().width >= 428 ? 332 : 306; } catch (e) {}
     const gs = w.addStack(); gs.size = new Size(breit, 66);
-    gs.addImage(verlauf(st, breit)).imageSize = new Size(breit, 66);
+    gs.backgroundImage = verlauf(st, breit); gs.addSpacer();             // als Hintergrund, so wird die Grafik nicht verkleinert
     w.addSpacer(4);
   }
 
