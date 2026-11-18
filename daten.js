@@ -80,6 +80,20 @@ const Wetter = (() => {
     return gj.timestamps.map((ts, i) => ({ t: new Date(ts), v: Object.fromEntries(Object.entries(par).map(([k, p]) => [k, p.data[i]])) }));
   }
 
+  // Vorhersage in zwei Teilen holen: GeoSphere lehnt die grosse Abfrage zeitweise ab (503).
+  // Der Kern reicht zur Not allein, die Zusatzwerte fehlen dann nur in den Details.
+  async function nwpHolen(ll) {
+    const [kern, extra] = await Promise.all([
+      hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=2t,tp,tcc,sy,10fg,10u,10v,2r`).catch(() => null),
+      hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=sund,sf,pt,snowlmt,msl,ssrd,cape`).catch(() => null),
+    ]);
+    if (!kern) return null;
+    if (extra && extra.timestamps?.length === kern.timestamps.length) Object.assign(kern.features[0].properties.parameters, extra.features[0].properties.parameters);
+    else { const par = kern.features[0].properties.parameters, n = kern.timestamps.length;
+      ["sund", "sf", "pt", "snowlmt", "msl", "ssrd", "cape"].forEach(k => { par[k] = { data: Array(n).fill(null) }; }); }
+    return kern;
+  }
+
   /* ---------- Standort ---------- */
   // Fehlercodes: 0 nicht unterstuetzt, 1 abgelehnt, 2 nicht verfuegbar, 3 Zeitueberschreitung
   // iOS ruft bei Apps am Home-Bildschirm die Standortabfrage manchmal nie zurueck.
@@ -342,7 +356,7 @@ const Wetter = (() => {
     const omUrl = imGebiet ? omBasis : omStd;
     const messP = imGebiet ? messung(lat, lon).catch(() => null) : Promise.resolve(null), luftP = luft(lat, lon).catch(() => null);
     const [nwp, ens, nc, om] = await Promise.all([
-      imGebiet ? hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=2t,tp,tcc,sy,10fg,10u,10v,2r,sund,sf,pt,snowlmt,msl,ssrd,cape`).catch(() => null) : null,
+      imGebiet ? nwpHolen(ll) : null,
       imGebiet ? hole(`${GEO}/ensemble-v2-1h-1km?${ll}&parameters=tp_p10,tp_p50,tp_p90,2t_p10,2t_p90,10fg_p90`).catch(() => null) : null,
       imGebiet ? hole(`${GEO}/nowcast-v1-15min-1km?${ll}&parameters=rr`, 20000).catch(() => null) : null,
       hole(omUrl).catch(() => null),

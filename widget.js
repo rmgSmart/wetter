@@ -22,7 +22,7 @@ class AbortController { constructor() { this.signal = { aborted: false }; } abor
 const warte = ms => new Promise(r => setTimeout(r, ms));
 const PROTOKOLL = [];                 // fuer die Diagnose beim Start in der Scriptable-App
 async function fetch(url) {
-  const host = url.split("/")[2] + (url.includes("nwp-v2") ? " nwp" : url.includes("ensemble") ? " ensemble" : url.includes("nowcast") ? " nowcast" : "");
+  const host = url.split("/")[2] + (url.includes("nwp-v2") ? (url.includes("sund") ? " nwp Zusatz" : " nwp Kern") : url.includes("ensemble") ? " ensemble" : url.includes("nowcast") ? " nowcast" : "");
   const t0 = Date.now();
   try {
     const a = await fetch0(url);
