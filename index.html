@@ -274,6 +274,7 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
 :root[data-theme="gigio"][data-sky] { color-scheme: dark; --sky-a: #0b0b0d; --sky-b: #0b0b0d; --ink: #ffffff; --soft: rgba(255,255,255,.76); --panel: rgba(13,13,16,.64); --line: rgba(255,255,255,.17);
   --accent: #f6a9bb; --wet: #9fdcff; --glass-edge: rgba(255,255,255,.3); --lift: rgba(255,255,255,.14); }
 :root[data-theme="gigio"] .sky { background: #0b0b0d url(fell.jpg) center top / cover no-repeat; }
+:root[data-theme="gigio"] .hero { text-shadow: 0 1px 6px rgba(0,0,0,.75), 0 0 2px rgba(0,0,0,.6); }
 :root[data-theme="gigio"] .place, :root[data-theme="gigio"] footer { background: rgba(13,13,16,.72); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); padding: 14px 16px; margin-top: 12px; border-radius: 22px; border: .5px solid var(--line); }
 .thema { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; }
 .thema > span { font-size: 16px; font-weight: 500; }
@@ -381,8 +382,8 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611181052"></script>
-<script src="gigio.js?v=202611181052"></script>
+<script src="daten.js?v=202611181447"></script>
+<script src="gigio.js?v=202611181447"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -887,7 +888,7 @@ addEventListener("focus", frisch);
 addEventListener("online", frisch);
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611181052";
+const VERSION = "202611181447";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
