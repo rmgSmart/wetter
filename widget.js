@@ -19,7 +19,14 @@ const sichern = () => { try { fm.writeString(SPEICHER, JSON.stringify(speicher))
 const setTimeout = (f, ms) => Timer.schedule(Math.max(1, ms || 0), false, f);
 const clearTimeout = t => { try { if (t && t.invalidate) t.invalidate(); } catch (e) {} };
 class AbortController { constructor() { this.signal = { aborted: false }; } abort() { this.signal.aborted = true; } }
+const PROTOKOLL = [];                 // fuer die Diagnose beim Start in der Scriptable-App
 async function fetch(url) {
+  const host = url.split("/")[2] + (url.includes("nwp-v2") ? " nwp" : url.includes("ensemble") ? " ensemble" : url.includes("nowcast") ? " nowcast" : "");
+  const t0 = Date.now();
+  try { const a = await fetch0(url); PROTOKOLL.push(`${host}: ${a.status}, ${Date.now() - t0} ms`); return a; }
+  catch (e) { PROTOKOLL.push(`${host}: FEHLER ${e}, ${Date.now() - t0} ms`); throw e; }
+}
+async function fetch0(url) {
   const r = new Request(url);
   r.timeoutInterval = 20;
   r.headers = { "User-Agent": "GigioWetter-Widget (Scriptable)", "Accept": "application/json" };
@@ -28,8 +35,8 @@ async function fetch(url) {
   return { ok: status >= 200 && status < 300, status, json: async () => JSON.parse(text), text: async () => text };
 }
 const navigator = { geolocation: { getCurrentPosition(ok, fehler) {
-  try { Location.setAccuracyToThreeKilometers(); } catch (e) {}
-  Location.current().then(p => ok({ coords: { latitude: p.latitude, longitude: p.longitude } }), () => fehler && fehler({ code: 2 }));
+  try { Location.setAccuracyToHundredMeters(); } catch (e) {}
+  Location.current().then(p => { PROTOKOLL.push(`Standort: ${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`); ok({ coords: { latitude: p.latitude, longitude: p.longitude } }); }, e => { PROTOKOLL.push(`Standort: FEHLER ${e}`); fehler && fehler({ code: 2 }); });
 } } };
 const window = { isSecureContext: true };
 const warte = ms => new Promise(r => setTimeout(r, ms));
@@ -318,5 +325,11 @@ if (!d) {
 }
 
 if (config.runsInWidget) Script.setWidget(w);
-else await w.presentLarge();
+else {
+  // In der App: kurze Diagnose, woher die Daten kommen
+  const a = new Alert(); a.title = "GigioWetter Diagnose";
+  a.message = [d ? `Quelle: ${(d.quellen || []).join(", ")}` : "Keine Daten", d && d.lauf ? `Modelllauf: ${d.lauf}` : "", d ? `Ort: ${d.ort}` : "", veraltet ? "Gespeicherter Stand (offline)" : "", ...PROTOKOLL].filter(Boolean).join("\n");
+  a.addAction("Widget anzeigen"); await a.present();
+  await w.presentLarge();
+}
 Script.complete();
