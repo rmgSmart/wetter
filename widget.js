@@ -87,15 +87,20 @@ function symbol(stack, name, nacht, groesse) {
   img.tintColor = farbe(n ? s[3] : s[1]);
   return img;
 }
+// Farben wie das Aussehen "Klassisch" der App. Der untere Ton ist etwas dunkler als in der App,
+// damit die weisse Schrift im Widget ueberall gut lesbar bleibt.
 function himmel(sym, nacht) {
   const nass = /regen|gewitter/.test(sym);
-  if (nacht) return nass ? ["#031a2b", "#145a6c"] : /klar|heiter/.test(sym) ? ["#050a2c", "#40307c"] : ["#0c1228", "#434a74"];
-  if (sym === "gewitter") return ["#190f42", "#7a3f96"];
-  if (nass) return ["#08384c", "#1f8590"];
-  if (/schnee/.test(sym)) return ["#3f6c9c", "#8fb6dc"];
-  if (sym === "klar" || sym === "heiter") return ["#0a66f0", "#58aef6"];
-  if (sym === "wolkig") return ["#35548a", "#8098c2"];
-  return ["#3d4c60", "#76879c"];
+  let p;
+  if (nacht) p = sym === "schnee" ? ["#18243a", "#4d5d76"] : nass ? ["#0e151f", "#283545"] : /klar|heiter/.test(sym) ? ["#070d24", "#24315f"] : ["#161c25", "#353e4a"];
+  else if (sym === "gewitter") p = ["#231f3a", "#4a4763"];
+  else if (nass) p = ["#2f3d4c", "#586b7c"];
+  else if (/schnee/.test(sym)) p = ["#4d5d76", "#7a8899"];
+  else if (sym === "klar") p = ["#1f6fc9", "#79b8ee"];
+  else if (sym === "heiter") p = ["#3878bd", "#8db6dc"];
+  else p = ["#55636f", "#8a959e"];
+  const mix = (a, b, k) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.substr(i, 2), 16) * (1 - k) + parseInt(b.substr(i, 2), 16) * k).toString(16).padStart(2, "0")).join("");
+  return [p[0], mix(p[0], p[1], .5)];
 }
 const de = x => String(x).replace(".", ",");
 const grad = x => Math.round(x) + "°";
