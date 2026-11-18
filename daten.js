@@ -344,39 +344,59 @@ const Wetter = (() => {
   }
 
   /* ---------- Ablauf ---------- */
-  async function laden(wahl) {
-    const st = wahl ? { lat: wahl.lat, lon: wahl.lon } : await standort(), pos = st.lat != null ? st : null;
+  const OM_STD = "&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,snowfall,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,sunshine_duration,shortwave_radiation,cape,freezing_level_height";
+  async function laden(wahl, opt = {}) {
+    // Standort: sofort den zuletzt bekannten nehmen und im Hintergrund pruefen, ob er noch stimmt.
+    // Nur beim allerersten Start (oder im Widget) wird auf die Standortabfrage gewartet.
+    let gespeichert = null; try { gespeichert = JSON.parse(localStorage.getItem("pos")); } catch (e) {}
+    let st, standortNeu = null;
+    if (wahl) st = { lat: wahl.lat, lon: wahl.lon };
+    else if (opt.schnell !== false && gespeichert && gespeichert.lat != null) {
+      st = { lat: gespeichert.lat, lon: gespeichert.lon };
+      standortNeu = standort().then(p => p.lat != null && !p.alt && km(p.lat, p.lon, st.lat, st.lon) > 1).catch(() => false);
+    } else st = await standort();
+    const pos = st.lat != null ? st : null;
     const lat = pos ? pos.lat : FALLBACK.lat, lon = pos ? pos.lon : FALLBACK.lon;
     const ortP = wahl ? Promise.resolve(wahl.name) : pos ? ortsname(lat, lon) : Promise.resolve(FALLBACK.ort);
     const imGebiet = lat > GEO_BOX.s && lat < GEO_BOX.n && lon > GEO_BOX.w && lon < GEO_BOX.e;
     const ll = `lat_lon=${lat.toFixed(4)},${lon.toFixed(4)}`;
     const omBasis = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&timezone=auto&forecast_days=8`
       + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunshine_duration,uv_index_max&current=uv_index";
-    const omStd = omBasis + "&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,snowfall,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,sunshine_duration,shortwave_radiation,cape,freezing_level_height";
+    const omStd = omBasis + OM_STD;
     const omUrl = imGebiet ? omBasis : omStd;
     const messP = imGebiet ? messung(lat, lon).catch(() => null) : Promise.resolve(null), luftP = luft(lat, lon).catch(() => null);
-    const [nwp, ens, nc, om] = await Promise.all([
-      imGebiet ? nwpHolen(ll) : null,
-      imGebiet ? hole(`${GEO}/ensemble-v2-1h-1km?${ll}&parameters=tp_p10,tp_p50,tp_p90,2t_p10,2t_p90,10fg_p90`).catch(() => null) : null,
-      imGebiet ? hole(`${GEO}/nowcast-v1-15min-1km?${ll}&parameters=rr`, 20000).catch(() => null) : null,
-      hole(omUrl).catch(() => null),
-    ]);
-    let stunden = nwp ? stundenGeo(nwp, ens, lat, lon) : [], quellen = ["GeoSphere Austria (CC BY 4.0)"], lauf = nwp?.reference_time || null;
-    if (!stunden.length) {     // ausserhalb Oesterreichs oder GeoSphere nicht erreichbar
-      let o = om; if (!o?.hourly) o = await hole(omStd).catch(() => null);
-      stunden = o ? stundenOM(o, lat, lon).filter(s => new Date(s.zeit) > Date.now() - 36e5).slice(0, 60) : []; quellen = ["Open-Meteo (CC BY 4.0)"]; lauf = null;
-    }
-    if (!stunden.length) throw new Error("Keine Wetterdaten erreichbar");
+    // Ensemble (Regenwahrscheinlichkeit) und Nowcast sind oft langsam: nicht darauf warten, sondern nachreichen
+    const ensP = imGebiet ? hole(`${GEO}/ensemble-v2-1h-1km?${ll}&parameters=tp_p10,tp_p50,tp_p90,2t_p10,2t_p90,10fg_p90`).catch(() => null) : Promise.resolve(null);
+    const ncP = imGebiet ? hole(`${GEO}/nowcast-v1-15min-1km?${ll}&parameters=rr`, 20000).catch(() => null) : Promise.resolve(null);
+    let ens = null, nc = null, ensDa = false, ncDa = false;
+    ensP.then(x => { ens = x; ensDa = true; }); ncP.then(x => { nc = x; ncDa = true; });
+    const [nwp, om] = await Promise.all([imGebiet ? nwpHolen(ll) : null, hole(omUrl).catch(() => null)]);
+    await Promise.race([Promise.all([ensP, ncP]), new Promise(r => setTimeout(r, 1200))]);   // kurz warten, falls sie gleich da sind
+    let omH = null;
+    if (!nwp) omH = om?.hourly ? om : await hole(omStd).catch(() => null);
     const ort = await ortP;
-    const d = baue(stunden, om?.daily || null, new Date(), ort, lat, lon, quellen, lauf, nc);
-    d.standortFrei = !!pos && !st.alt; d.standortAlt = !!st.alt; d.standortFehler = d.standortFrei ? null : st.fehler; d.gewaehlt = !!wahl;
-    const uvTage = {}; (om?.daily?.time || []).forEach((t, i) => { const u = om.daily.uv_index_max?.[i]; if (u != null) uvTage[t] = Math.round(u); });
-    d.woche.forEach(w => { w.uv = uvTage[w.datum] ?? null; w.uv_text = uvText(w.uv); w.luft = null; });
-    const uvJ = om?.current?.uv_index, uvM = om?.daily?.uv_index_max?.[0];
-    d.uv = uvM != null || uvJ != null ? { jetzt: uvJ != null ? Math.round(uvJ) : null, max: uvM != null ? Math.round(uvM) : null, text: uvText(uvM ?? uvJ) } : null;
-    d.messung = null; d.pollen = null; d.luft = null;
-    // Messwerte und Luftqualitaet duerfen die Anzeige nicht aufhalten: kommen sie spaeter, werden sie nachgereicht
-    const extras = Promise.all([messP, luftP]).then(([m, lu]) => {
+    const jetzt = new Date();
+
+    function bauen(ensX, ncX) {
+      let stunden = nwp ? stundenGeo(nwp, ensX, lat, lon) : [], quellen = ["GeoSphere Austria (CC BY 4.0)"], lauf = nwp?.reference_time || null;
+      if (!stunden.length) {     // ausserhalb Oesterreichs oder GeoSphere nicht erreichbar
+        stunden = omH ? stundenOM(omH, lat, lon).filter(s => new Date(s.zeit) > Date.now() - 36e5).slice(0, 60) : []; quellen = ["Open-Meteo (CC BY 4.0)"]; lauf = null;
+      }
+      if (!stunden.length) throw new Error("Keine Wetterdaten erreichbar");
+      const d = baue(stunden, om?.daily || null, jetzt, ort, lat, lon, quellen, lauf, ncX);
+      d.standortFrei = !!pos && !st.alt; d.standortAlt = !!st.alt; d.standortFehler = d.standortFrei ? null : st.fehler; d.gewaehlt = !!wahl;
+      const uvTage = {}; (om?.daily?.time || []).forEach((t, i) => { const u = om.daily.uv_index_max?.[i]; if (u != null) uvTage[t] = Math.round(u); });
+      d.woche.forEach(w => { w.uv = uvTage[w.datum] ?? null; w.uv_text = uvText(w.uv); w.luft = null; });
+      const uvJ = om?.current?.uv_index, uvM = om?.daily?.uv_index_max?.[0];
+      d.uv = uvM != null || uvJ != null ? { jetzt: uvJ != null ? Math.round(uvJ) : null, max: uvM != null ? Math.round(uvM) : null, text: uvText(uvM ?? uvJ) } : null;
+      d.messung = null; d.pollen = null; d.luft = null;
+      return d;
+    }
+    const d = bauen(ensDa ? ens : null, ncDa ? nc : null);
+    d.vollstaendig = ensDa && ncDa;
+    // Nachreichen: Regenwahrscheinlichkeit, Nowcast, Messwerte, Luftqualitaet
+    const extras = Promise.all([messP, luftP, ensP, ncP]).then(([m, lu, e, n]) => {
+      if (!d.vollstaendig) { try { Object.assign(d, bauen(e, n)); } catch (x) {} d.vollstaendig = true; }
       d.messung = m; d.pollen = lu ? lu.pollen : null;
       d.woche.forEach(w => { const a = lu?.tage?.[w.datum]; w.luft = a != null ? Math.round(a) : null; w.luft_text = luftText(a); });
       d.luft = lu && (lu.jetzt != null || d.woche[0]?.luft != null) ? { jetzt: lu.jetzt, max: d.woche[0]?.luft ?? null, text: luftText(lu.jetzt ?? d.woche[0]?.luft) } : null;
@@ -385,6 +405,7 @@ const Wetter = (() => {
     });
     await Promise.race([extras, new Promise(r => setTimeout(r, 300))]);
     Object.defineProperty(d, "spaeter", { value: extras, enumerable: false });
+    if (standortNeu) Object.defineProperty(d, "standortNeu", { value: standortNeu, enumerable: false });
     return d;
   }
   return { laden, suche, _test: { baue, stundenGeo, nowcast } };

@@ -65,7 +65,7 @@ try {
   if (code) {
     const Wetter = new Function("fetch", "localStorage", "navigator", "window", "setTimeout", "clearTimeout", "AbortController", code + "\nreturn Wetter;")
       (fetch, localStorage, navigator, window, setTimeout, clearTimeout, AbortController);
-    d = await Promise.race([Wetter.laden(null), warte(45000).then(() => null)]);
+    d = await Promise.race([Wetter.laden(null, { schnell: false }), warte(45000).then(() => null)]);   // im Widget auf den echten Standort warten
     if (d && d.spaeter) await Promise.race([d.spaeter, warte(6000)]);       // Messwerte, falls schnell genug
     if (d) fm.writeString(datei("letzte.json"), JSON.stringify(d));
   }
