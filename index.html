@@ -380,8 +380,8 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611180939"></script>
-<script src="gigio.js?v=202611180939"></script>
+<script src="daten.js?v=202611181002"></script>
+<script src="gigio.js?v=202611181002"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -800,7 +800,11 @@ function setFx(n) {
   if (n === fx) return; fx = n; parts = [];
   const mk = (c, f) => { for (let i = 0; i < c; i++) parts.push(f(i)); };
   if (n === "rain" || n === "storm") mk(80, () => ({ x: rnd(0, W), y: rnd(0, H), l: rnd(10, 22), v: rnd(9, 15) }));
-  if (n === "wind") mk(46, () => ({ x: rnd(0, W), y: rnd(0, H), l: rnd(30, 90), v: rnd(10, 20) }));
+  // Wind: wenige lange, geschwungene Schlieren, manche mit Wirbel am Ende, dazu ein paar taumelnde Blaetter
+  if (n === "wind") {
+    mk(13, () => ({ x: rnd(-W, W), y: rnd(0, H), l: rnd(140, 320), v: rnd(3.5, 7), a: rnd(6, 16), w: rnd(90, 170), p: rnd(0, 6), o: rnd(.16, .32), curl: Math.random() < .35, blatt: false }));
+    mk(5, () => ({ x: rnd(-60, W), y: rnd(0, H), v: rnd(2.5, 4.5), p: rnd(0, 6), s: rnd(5, 8), blatt: true }));
+  }
   if (n === "snow") mk(70, () => ({ x: rnd(0, W), y: rnd(0, H), r: rnd(1, 3.2), v: rnd(.4, 1.3), p: rnd(0, 6) }));
   if (n === "stars") mk(70, () => ({ x: rnd(0, W), y: rnd(0, H * .7), r: rnd(.4, 1.4), p: rnd(0, 6) }));
   if (n === "clouds" || n === "fog") mk(n === "fog" ? 7 : 5, i => ({ x: rnd(-200, W), y: n === "fog" ? rnd(0, H) : rnd(-40, H * .45), r: rnd(180, 320), v: rnd(.08, .25), a: n === "fog" ? .16 : .11 }));
@@ -822,9 +826,30 @@ function frame(t) {
     if (fx === "storm") { if (!still && Math.random() < .004) flash = 1; if (flash > .02) { cx.fillStyle = `rgba(255,255,230,${flash * .35})`; cx.fillRect(0, 0, W, H); flash *= .86; } }
   }
   if (fx === "wind") {
-    cx.strokeStyle = `rgba(${ink},.2)`; cx.lineWidth = 1.2; cx.lineCap = "round"; cx.beginPath();
-    for (const p of parts) { cx.moveTo(p.x, p.y); cx.lineTo(p.x + p.l, p.y - p.l * .06); p.x += p.v; if (p.x > W + 20) { p.x = -100; p.y = rnd(0, H); } }
-    cx.stroke();
+    cx.lineCap = "round"; cx.lineJoin = "round";
+    for (const p of parts) {
+      if (p.blatt) {                                   // Blatt: wellig fliegen und dabei taumeln
+        const y = p.y + Math.sin(t / 600 + p.p) * 18, r = t / 380 + p.p;
+        cx.save(); cx.translate(p.x, y); cx.rotate(r); cx.scale(1, .45 + .4 * Math.sin(t / 250 + p.p));
+        cx.fillStyle = `rgba(${ink},.32)`; cx.beginPath(); cx.ellipse(0, 0, p.s, p.s * .5, 0, 0, 7); cx.fill(); cx.restore();
+        p.x += p.v; p.y += Math.sin(t / 900 + p.p) * .3;
+        if (p.x > W + 30) { p.x = -30; p.y = rnd(0, H); }
+        continue;
+      }
+      const yv = x => p.y + Math.sin(x / p.w + p.p + t / 1600) * p.a;
+      const x0 = p.x, x1 = p.x + p.l;
+      const g = cx.createLinearGradient(x0, 0, x1, 0);
+      g.addColorStop(0, `rgba(${ink},0)`); g.addColorStop(.55, `rgba(${ink},${p.o})`); g.addColorStop(1, `rgba(${ink},${p.o * .6})`);
+      cx.strokeStyle = g; cx.lineWidth = 1.8; cx.beginPath(); cx.moveTo(x0, yv(x0));
+      for (let x = x0 + 8; x <= x1; x += 8) cx.lineTo(x, yv(x));
+      if (p.curl) {                                    // kleiner Wirbel am Ende, wie im Wind-Symbol
+        const ex = x1, ey = yv(x1), r = 9;
+        cx.arc(ex, ey - r, r, Math.PI / 2, Math.PI * 2.1, true);
+      }
+      cx.stroke();
+      p.x += p.v;
+      if (p.x > W + 40) { p.x = -p.l - rnd(0, W * .6); p.y = rnd(0, H); }
+    }
   }
   if (fx === "snow") {
     cx.fillStyle = light ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.8)";
@@ -861,7 +886,7 @@ addEventListener("focus", frisch);
 addEventListener("online", frisch);
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611180939";
+const VERSION = "202611181002";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
