@@ -19,17 +19,26 @@ const sichern = () => { try { fm.writeString(SPEICHER, JSON.stringify(speicher))
 const setTimeout = (f, ms) => Timer.schedule(Math.max(1, ms || 0), false, f);
 const clearTimeout = t => { try { if (t && t.invalidate) t.invalidate(); } catch (e) {} };
 class AbortController { constructor() { this.signal = { aborted: false }; } abort() { this.signal.aborted = true; } }
+const warte = ms => new Promise(r => setTimeout(r, ms));
 const PROTOKOLL = [];                 // fuer die Diagnose beim Start in der Scriptable-App
 async function fetch(url) {
   const host = url.split("/")[2] + (url.includes("nwp-v2") ? " nwp" : url.includes("ensemble") ? " ensemble" : url.includes("nowcast") ? " nowcast" : "");
   const t0 = Date.now();
-  try { const a = await fetch0(url); PROTOKOLL.push(`${host}: ${a.status}, ${Date.now() - t0} ms`); return a; }
+  try {
+    let a = await fetch0(url);
+    if (a.status === 503 || a.status === 429) { await warte(1200); a = await fetch0(url); PROTOKOLL.push(`${host}: zweiter Versuch`); }
+    PROTOKOLL.push(`${host}: ${a.status}, ${Date.now() - t0} ms`); return a;
+  }
   catch (e) { PROTOKOLL.push(`${host}: FEHLER ${e}, ${Date.now() - t0} ms`); throw e; }
 }
 async function fetch0(url) {
   const r = new Request(url);
   r.timeoutInterval = 20;
-  r.headers = { "User-Agent": "GigioWetter-Widget (Scriptable)", "Accept": "application/json" };
+  // GeoSphere lehnt Anfragen mit eigener Kennung ab (503), deshalb dort wie Safari auftreten.
+  // Nominatim verlangt dagegen eine eindeutige Kennung.
+  r.headers = url.includes("nominatim")
+    ? { "User-Agent": "GigioWetter-Widget (Scriptable)", "Accept": "application/json" }
+    : { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1", "Accept": "application/json, text/plain, */*", "Accept-Language": "de-AT,de;q=0.9" };
   const text = await r.loadString();
   const status = r.response && r.response.statusCode ? r.response.statusCode : 200;
   return { ok: status >= 200 && status < 300, status, json: async () => JSON.parse(text), text: async () => text };
@@ -39,7 +48,6 @@ const navigator = { geolocation: { getCurrentPosition(ok, fehler) {
   Location.current().then(p => { PROTOKOLL.push(`Standort: ${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`); ok({ coords: { latitude: p.latitude, longitude: p.longitude } }); }, e => { PROTOKOLL.push(`Standort: FEHLER ${e}`); fehler && fehler({ code: 2 }); });
 } } };
 const window = { isSecureContext: true };
-const warte = ms => new Promise(r => setTimeout(r, ms));
 
 /* ---------- Daten holen ---------- */
 async function holeCode(name) {
