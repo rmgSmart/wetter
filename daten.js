@@ -63,10 +63,17 @@ const Wetter = (() => {
     if (p10 >= .1) return ["sicher", 90]; if (p50 >= .1) return ["wahrscheinlich", 65]; if (p90 >= .2) return ["möglich", 30];
     return ["trocken", 5];
   }
-  async function hole(url, ms = 25000) {
+  // GeoSphere antwortet zeitweise mit 502, 503 oder 504. Dann bis zu zweimal neu versuchen.
+  async function hole(url, ms = 25000, versuch = 0) {
     const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
-    try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error(r.status); return await r.json(); }
+    let r;
+    try { r = await fetch(url, { signal: c.signal }); if (r.ok) return await r.json(); }
     finally { clearTimeout(t); }
+    if ([429, 500, 502, 503, 504].includes(r.status) && versuch < 2) {
+      await new Promise(ok => setTimeout(ok, 1200 * (versuch + 1)));
+      return hole(url, ms, versuch + 1);
+    }
+    throw new Error(r.status);
   }
   function reihe(gj) {
     const par = gj.features[0].properties.parameters;

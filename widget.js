@@ -25,8 +25,7 @@ async function fetch(url) {
   const host = url.split("/")[2] + (url.includes("nwp-v2") ? " nwp" : url.includes("ensemble") ? " ensemble" : url.includes("nowcast") ? " nowcast" : "");
   const t0 = Date.now();
   try {
-    let a = await fetch0(url);
-    if (a.status === 503 || a.status === 429) { await warte(1200); a = await fetch0(url); PROTOKOLL.push(`${host}: zweiter Versuch`); }
+    const a = await fetch0(url);
     PROTOKOLL.push(`${host}: ${a.status}, ${Date.now() - t0} ms`); return a;
   }
   catch (e) { PROTOKOLL.push(`${host}: FEHLER ${e}, ${Date.now() - t0} ms`); throw e; }
