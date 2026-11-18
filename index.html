@@ -379,8 +379,8 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611180921"></script>
-<script src="gigio.js?v=202611180921"></script>
+<script src="daten.js?v=202611180931"></script>
+<script src="gigio.js?v=202611180931"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -445,10 +445,8 @@ function skyFor(ch, nacht) {
 }
 const FX = { sonnig: "sun", heiter: "sun", hitze: "sun", frost: "sun", bewoelkt: "clouds", nebel: "fog",
              regen: "rain", gewitter: "storm", sturm: "wind", schnee: "snow" };
-function orderFor(ch) {
-  if (ch === "sturm") return ["wind", "stunden", "regen", "woche", "astro", "details"];
-  return ["stunden", "regen", "wind", "woche", "astro", "details"];
-}
+// Immer gleiche Reihenfolge: Stunden, Niederschlag (nur wenn welcher kommt), Wind (nur bei kraeftigen Boeen), Woche
+function orderFor() { return ["stunden", "regen", "wind", "woche", "astro", "details"]; }
 
 /* ---------- Karten ---------- */
 // Farbe einer Stunde, gleiche Logik wie bei den Tagen: Regen blau, Sonne gelb, Wolken grau, klare Nacht dunkelblau
@@ -504,6 +502,8 @@ function cardStunden(d) {
 }
 
 function cardRegen(d) {
+  { const st = d.stunden.slice(0, 24);                  // trocken und kein Regen im Nowcast: Karte ganz weglassen
+    if (!st.some(s => s.regen >= 0.1 || (s.regen_p90 || 0) >= 0.2) && !(d.nowcast && d.nowcast.regnet)) return ""; }
   const n = d.nowcast, hatNc = !!(n && n.schritte && n.schritte.length);
   const view = hatNc ? (regenView || (n.regnet ? "3h" : "24h")) : "24h";
   const h = d.heute;
@@ -857,7 +857,7 @@ addEventListener("focus", frisch);
 addEventListener("online", frisch);
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611180921";
+const VERSION = "202611180931";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
