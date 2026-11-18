@@ -289,7 +289,8 @@ if (!d) {
   info(rechts, "sunrise.fill", h.sonnenaufgang, farbe("#ffd866"));
   info(rechts, "sunset.fill", h.sonnenuntergang, farbe("#ffb070"));
   const alter = Math.round((Date.now() - new Date(d.stand).getTime()) / 60000);
-  info(rechts, "clock", alter < 1 ? "gerade" : alter < 60 ? `vor ${alter} min` : `Stand ${d.stand.slice(11, 16)}`, veraltet || alter > 45 ? farbe("#ffb340") : WEISS);
+  if (d.ersatz) info(rechts, "exclamationmark.triangle.fill", d.ersatz === "alt" ? `GeoSphere ${d.geoStand.slice(11, 16)}` : "Open-Meteo", farbe("#ffb340"));
+  else info(rechts, "clock", alter < 1 ? "gerade" : alter < 60 ? `vor ${alter} min` : `Stand ${d.stand.slice(11, 16)}`, veraltet || alter > 45 ? farbe("#ffb340") : WEISS);
 
   w.addSpacer(3);
   // Den Satz zur Temperatur weglassen, die steht ohnehin in den Kaestchen. So passt der Rest in zwei Zeilen.

@@ -250,6 +250,7 @@ html.veraltet .hero .loc .alter { color: #ffb340; font-weight: 600; }
 html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin: 0 auto; width: -webkit-fit-content; width: fit-content; }
 .hero .loc { white-space: nowrap; max-width: 100%; overflow: hidden; }
 .mess { font-size: 12.5px; color: var(--soft); margin-top: 6px; text-wrap: balance; }
+.mess .ersatz { color: #ffb340; font-weight: 600; }
 #orte { position: fixed; inset: 0; z-index: 70; background: rgba(4,10,18,.55); display: flex; align-items: flex-end; justify-content: center; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 #orte[hidden] { display: none; }
 #orte .blatt { width: 100%; max-width: 460px; max-height: 86vh; overflow-y: auto; background: #18273a; color: #fff; border-radius: 26px 26px 0 0; padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 18px); box-shadow: 0 -10px 40px rgba(0,0,0,.4); }
@@ -379,8 +380,8 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611180931"></script>
-<script src="gigio.js?v=202611180931"></script>
+<script src="daten.js?v=202611180939"></script>
+<script src="gigio.js?v=202611180939"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -671,7 +672,9 @@ function render() {
   $("stale").hidden = true; document.documentElement.classList.toggle("veraltet", !!veraltet);
   const mess = d.messung && Date.now() - new Date(d.messung.zeit).getTime() < 60 * 60000 ? d.messung : null;
   $("temp").innerHTML = `${Math.round(mess ? mess.temp : d.jetzt.temp)}<sup id="deg">°</sup>`;
-  $("mess").textContent = mess ? `Nächste Messstation: ${mess.station}, ${de(mess.km)} km entfernt, ${mess.zeit.slice(11, 16)} Uhr` : "";
+  const hinweis = d.ersatz === "alt" ? `GeoSphere gerade nicht erreichbar, Vorhersage von ${d.geoStand.slice(11, 16)} Uhr`
+    : d.ersatz === "openmeteo" ? "GeoSphere nicht erreichbar, Ersatzdaten von Open-Meteo" : "";
+  $("mess").innerHTML = [mess ? `Nächste Messstation: ${mess.station}, ${de(mess.km)} km entfernt, ${mess.zeit.slice(11, 16)} Uhr` : "", hinweis ? `<span class="ersatz">${hinweis}</span>` : ""].filter(Boolean).join("<br>");
   document.documentElement.classList.remove("leer"); $("splash").classList.add("weg");
   const naechste = d.stunden.slice(0, 12), nass = naechste.find(s => s.regen >= 0.1);
   $("icon").innerHTML = icon(nass ? nass.symbol : d.jetzt.symbol, nass ? nass.nacht : d.nacht);
@@ -723,7 +726,7 @@ setInterval(zeigeAlter, 30000);
 const lese = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
 const schreibe = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 let ORTWAHL = lese("ortwahl", null), ORTE = lese("orte", []);
-let ladeNr = 0, WECHSEL = null, wechselAlt = false;
+let ladeNr = 0, WECHSEL = null, wechselAlt = false, nochmalT = 0;
 const ortKey = o => o ? `letzte:${o.lat.toFixed(3)},${o.lon.toFixed(3)}` : "letzte:gps";
 function fertigGeladen() { WECHSEL = null; document.documentElement.classList.remove("wechsel"); }
 async function load(neuStart = false) {
@@ -738,6 +741,7 @@ async function load(neuStart = false) {
     DATA = neu; zuletzt = Date.now(); merke(); fertigGeladen();
     neu.spaeter?.then(() => { if (DATA === neu) { merke(); render(); } });      // Messwerte nachreichen
     neu.standortNeu?.then(weg => { if (weg && DATA === neu && !ORTWAHL) load(true); });   // deutlich anderswo: mit neuem Standort laden
+    clearTimeout(nochmalT); if (neu.ersatz) nochmalT = setTimeout(() => { if (DATA === neu && !document.hidden) load(); }, 60000);   // GeoSphere bald noch einmal versuchen
   } else if (WECHSEL && DATA && wechselAlt) { fertigGeladen();        // zwischengespeicherter Stand des Orts bleibt stehen
   } else if (WECHSEL) {                                // neuer Ort nicht erreichbar: ehrlich sagen, alten Stand nicht als neuen ausgeben
     $("loc").innerHTML = `${WECHSEL} · nicht erreichbar, tippen zum Ändern`; return;
@@ -857,7 +861,7 @@ addEventListener("focus", frisch);
 addEventListener("online", frisch);
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611180931";
+const VERSION = "202611180939";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();

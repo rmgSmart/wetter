@@ -84,14 +84,31 @@ const Wetter = (() => {
   // Der Kern reicht zur Not allein, die Zusatzwerte fehlen dann nur in den Details.
   async function nwpHolen(ll) {
     const [kern, extra] = await Promise.all([
-      hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=2t,tp,tcc,sy,10fg,10u,10v,2r`).catch(() => null),
-      hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=sund,sf,pt,snowlmt,msl,ssrd,cape`).catch(() => null),
+      hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=2t,tp,tcc,sy,10fg,10u,10v,2r`, 45000).catch(() => null),
+      hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=sund,sf,pt,snowlmt,msl,ssrd,cape`, 45000).catch(() => null),
     ]);
     if (!kern) return null;
     if (extra && extra.timestamps?.length === kern.timestamps.length) Object.assign(kern.features[0].properties.parameters, extra.features[0].properties.parameters);
     else { const par = kern.features[0].properties.parameters, n = kern.timestamps.length;
       ["sund", "sf", "pt", "snowlmt", "msl", "ssrd", "cape"].forEach(k => { par[k] = { data: Array(n).fill(null) }; }); }
     return kern;
+  }
+
+  // Letzte erfolgreiche GeoSphere-Antwort je Ort aufheben. Eine Vorhersage reicht 60 Stunden weit,
+  // eine bis zu 6 Stunden alte ist also weiter brauchbar und besser als ein anderes Modell.
+  const GEO_MAX = 6 * 36e5;
+  function geoMerke(art, lat, lon, daten) {
+    const key = `geo:${art}:${lat.toFixed(2)},${lon.toFixed(2)}`;
+    try {
+      localStorage.setItem(key, JSON.stringify({ t: Date.now(), daten }));
+      const liste = (JSON.parse(localStorage.getItem("geo:liste") || "[]")).filter(k => k !== key); liste.push(key);
+      while (liste.length > 8) localStorage.removeItem(liste.shift());
+      localStorage.setItem("geo:liste", JSON.stringify(liste));
+    } catch (e) {}
+  }
+  function geoAlt(art, lat, lon) {
+    try { const c = JSON.parse(localStorage.getItem(`geo:${art}:${lat.toFixed(2)},${lon.toFixed(2)}`)); if (c && Date.now() - c.t < GEO_MAX) return c; } catch (e) {}
+    return null;
   }
 
   /* ---------- Standort ---------- */
@@ -369,9 +386,13 @@ const Wetter = (() => {
     const ensP = imGebiet ? hole(`${GEO}/ensemble-v2-1h-1km?${ll}&parameters=tp_p10,tp_p50,tp_p90,2t_p10,2t_p90,10fg_p90`).catch(() => null) : Promise.resolve(null);
     const ncP = imGebiet ? hole(`${GEO}/nowcast-v1-15min-1km?${ll}&parameters=rr`, 20000).catch(() => null) : Promise.resolve(null);
     let ens = null, nc = null, ensDa = false, ncDa = false;
-    ensP.then(x => { ens = x; ensDa = true; }); ncP.then(x => { nc = x; ncDa = true; });
-    const [nwp, om] = await Promise.all([imGebiet ? nwpHolen(ll) : null, hole(omUrl).catch(() => null)]);
-    await Promise.race([Promise.all([ensP, ncP]), new Promise(r => setTimeout(r, 1200))]);   // kurz warten, falls sie gleich da sind
+    const ensP2 = ensP.then(x => { if (x) geoMerke("ens", lat, lon, x); else { const c = imGebiet ? geoAlt("ens", lat, lon) : null; if (c) return c.daten; } return x; });
+    ensP2.then(x => { ens = x; ensDa = true; }); ncP.then(x => { nc = x; ncDa = true; });
+    let [nwp, om] = await Promise.all([imGebiet ? nwpHolen(ll) : null, hole(omUrl).catch(() => null)]);
+    let geoStand = null;                                  // gesetzt, wenn eine aufgehobene GeoSphere-Vorhersage verwendet wird
+    if (imGebiet && nwp) geoMerke("nwp", lat, lon, nwp);
+    else if (imGebiet) { const c = geoAlt("nwp", lat, lon); if (c) { nwp = c.daten; geoStand = new Date(c.t); } }
+    await Promise.race([Promise.all([ensP2, ncP]), new Promise(r => setTimeout(r, 1200))]);   // kurz warten, falls sie gleich da sind
     let omH = null;
     if (!nwp) omH = om?.hourly ? om : await hole(omStd).catch(() => null);
     const ort = await ortP;
@@ -393,9 +414,11 @@ const Wetter = (() => {
       return d;
     }
     const d = bauen(ensDa ? ens : null, ncDa ? nc : null);
+    d.ersatz = !imGebiet ? null : geoStand ? "alt" : !nwp ? "openmeteo" : null;
+    d.geoStand = geoStand ? iso(geoStand) : null;
     d.vollstaendig = ensDa && ncDa;
     // Nachreichen: Regenwahrscheinlichkeit, Nowcast, Messwerte, Luftqualitaet
-    const extras = Promise.all([messP, luftP, ensP, ncP]).then(([m, lu, e, n]) => {
+    const extras = Promise.all([messP, luftP, ensP2, ncP]).then(([m, lu, e, n]) => {
       if (!d.vollstaendig) { try { Object.assign(d, bauen(e, n)); } catch (x) {} d.vollstaendig = true; }
       d.messung = m; d.pollen = lu ? lu.pollen : null;
       d.woche.forEach(w => { const a = lu?.tage?.[w.datum]; w.luft = a != null ? Math.round(a) : null; w.luft_text = luftText(a); });
