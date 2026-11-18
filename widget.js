@@ -333,10 +333,7 @@ if (!d) {
 
 if (config.runsInWidget) Script.setWidget(w);
 else {
-  // In der App: kurze Diagnose, woher die Daten kommen
-  const a = new Alert(); a.title = "GigioWetter Diagnose";
-  a.message = [d ? `Quelle: ${(d.quellen || []).join(", ")}` : "Keine Daten", d && d.modelllauf ? `Modelllauf: ${d.modelllauf}` : "GeoSphere-Modelllauf: keiner", d ? `Ort: ${d.ort}` : "", veraltet ? "Gespeicherter Stand (offline)" : "", ...PROTOKOLL].filter(Boolean).join("\n");
-  a.addAction("Widget anzeigen"); await a.present();
+  console.log(PROTOKOLL.join("\n"));          // Diagnose steht im Scriptable-Protokoll
   await w.presentLarge();
 }
 Script.complete();
