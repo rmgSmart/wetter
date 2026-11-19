@@ -64,14 +64,14 @@ const Wetter = (() => {
     return ["trocken", 5];
   }
   // GeoSphere antwortet zeitweise mit 502, 503 oder 504. Dann bis zu zweimal neu versuchen.
-  async function hole(url, ms = 25000, versuch = 0) {
+  async function hole(url, ms = 25000, versuch = 0, max = 2) {
     const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
     let r;
     try { r = await fetch(url, { signal: c.signal }); if (r.ok) return await r.json(); }
     finally { clearTimeout(t); }
-    if ([429, 500, 502, 503, 504].includes(r.status) && versuch < 2) {
+    if ([429, 500, 502, 503, 504].includes(r.status) && versuch < max) {
       await new Promise(ok => setTimeout(ok, 1200 * (versuch + 1)));
-      return hole(url, ms, versuch + 1);
+      return hole(url, ms, versuch + 1, max);
     }
     throw new Error(r.status);
   }
@@ -82,11 +82,14 @@ const Wetter = (() => {
 
   // Vorhersage in zwei Teilen holen: GeoSphere lehnt die grosse Abfrage zeitweise ab (503).
   // Der Kern reicht zur Not allein, die Zusatzwerte fehlen dann nur in den Details.
-  async function nwpHolen(ll) {
-    const [kern, extra] = await Promise.all([
-      hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=2t,tp,tcc,sy,10fg,10u,10v,2r`, 45000).catch(() => null),
-      hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=sund,sf,pt,snowlmt,msl,ssrd,cape`, 45000).catch(() => null),
-    ]);
+  // geduldig: lange warten und wiederholen; eilig (es gibt eine frische gespeicherte Vorhersage): kurz und ohne Wiederholung
+  async function nwpHolen(ll, eilig = false) {
+    const ms = eilig ? 8000 : 30000, max = eilig ? 0 : 1;
+    const kernP = hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=2t,tp,tcc,sy,10fg,10u,10v,2r`, ms, 0, max).catch(() => null);
+    const extraP = hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=sund,sf,pt,snowlmt,msl,ssrd,cape`, ms, 0, max).catch(() => null);
+    const kern = await kernP;
+    // Auf die Zusatzwerte hoechstens 2 Sekunden laenger warten, sie sind nur fuer die Details
+    const extra = kern ? await Promise.race([extraP, new Promise(r => setTimeout(() => r(null), 2000))]) : null;
     if (!kern) return null;
     if (extra && extra.timestamps?.length === kern.timestamps.length) Object.assign(kern.features[0].properties.parameters, extra.features[0].properties.parameters);
     else { const par = kern.features[0].properties.parameters, n = kern.timestamps.length;
@@ -388,7 +391,8 @@ const Wetter = (() => {
     let ens = null, nc = null, ensDa = false, ncDa = false;
     const ensP2 = ensP.then(x => { if (x) geoMerke("ens", lat, lon, x); else { const c = imGebiet ? geoAlt("ens", lat, lon) : null; if (c) return c.daten; } return x; });
     ensP2.then(x => { ens = x; ensDa = true; }); ncP.then(x => { nc = x; ncDa = true; });
-    let [nwp, om] = await Promise.all([imGebiet ? nwpHolen(ll) : null, hole(omUrl).catch(() => null)]);
+    const vorrat = imGebiet ? geoAlt("nwp", lat, lon) : null, eilig = !!(vorrat && Date.now() - vorrat.t < 3 * 36e5);
+    let [nwp, om] = await Promise.all([imGebiet ? nwpHolen(ll, eilig) : null, hole(omUrl, 15000).catch(() => null)]);
     let geoStand = null;                                  // gesetzt, wenn eine aufgehobene GeoSphere-Vorhersage verwendet wird
     if (imGebiet && nwp) geoMerke("nwp", lat, lon, nwp);
     else if (imGebiet) { const c = geoAlt("nwp", lat, lon); if (c) { nwp = c.daten; geoStand = new Date(c.t); } }
