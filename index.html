@@ -119,6 +119,9 @@ svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--soft); margin-top: 6px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; background: var(--wet); }
 .legend i.maybe { opacity: .32; }
+.card .regenart { font-size: 14px; font-weight: 500; color: var(--soft); margin: -6px 0 8px; }
+.legend.klein { font-size: 11.5px; gap: 12px; margin-top: 2px; }
+.legend.klein i { width: 8px; height: 8px; margin-right: 4px; }
 
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin-top: 8px; }
 .tile .k { font-size: 12.5px; color: var(--soft); }
@@ -382,8 +385,8 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611191327"></script>
-<script src="gigio.js?v=202611191327"></script>
+<script src="daten.js?v=202611191625"></script>
+<script src="gigio.js?v=202611191625"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -510,29 +513,29 @@ function cardRegen(d) {
   const n = d.nowcast, hatNc = !!(n && n.schritte && n.schritte.length);
   const view = hatNc ? (regenView || (n.regnet ? "3h" : "24h")) : "24h";
   const h = d.heute;
-  const zusatz = `<div class="tiles">
-      ${h.arten_24h && h.arten_24h.length ? `<div class="tile"><div class="k">Niederschlagsart</div><div class="v klein">${h.arten_24h.join(", dann ")}</div></div>` : ""}</div>`;
+  const art = h.arten_24h && h.arten_24h.length ? h.arten_24h.join(", dann ") : "";
+  const artZeile = art && art !== "Regen" ? `<p class="regenart">${art}</p>` : "";       // Niederschlagsart klein unter der Ueberschrift
   const seg = hatNc ? `<div class="seg" role="group" aria-label="Zeitraum">
       <button type="button" data-rv="3h" aria-pressed="${view === "3h"}">3 Std</button><button type="button" data-rv="24h" aria-pressed="${view === "24h"}">24 Std</button></div>` : "";
-  const kopf = lead => `<div class="head"><h2>Niederschlag</h2>${seg}</div><p class="lead">${lead}</p>`;
+  const kopf = lead => `<div class="head"><h2>Niederschlag</h2>${seg}</div><p class="lead">${lead}</p>${artZeile}`;
+  const oben = mx => mx <= .5 ? .5 : mx <= 1 ? 1 : Math.ceil(mx);          // Skala nur so hoch wie noetig
   const W = 336;
 
   if (view === "3h") {
-    const st = n.schritte, top = Math.max(0.5, Math.ceil(Math.max(...st.map(s => s.regen)) * 2) / 2), H = 96, x0 = 4, bw = (W - 34 - x0) / st.length, y = v => H - v / top * H;
+    const st = n.schritte, top = oben(Math.max(...st.map(s => s.regen))), H = 60, x0 = 4, bw = (W - 34 - x0) / st.length, y = v => H - v / top * H;
     const bars = st.map((s, i) => (s.regen > 0 ? `<rect x="${x0 + i * bw + 1.5}" y="${y(s.regen)}" width="${bw - 3}" height="${Math.max(H - y(s.regen), 1.5)}" rx="2.5" fill="var(--wet)"/>` : "") +
       (i % 4 === 3 ? `<text x="${x0 + (i + 1) * bw}" y="${H + 14}" text-anchor="middle">${s.zeit.slice(11, 16)}</text>` : "")).join("");
     const grid = [0, top / 2, top].map(v => `<line x1="${x0}" x2="${W - 32}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${W}" y="${y(v) + 3.5}" text-anchor="end">${de(v)}${v === top ? " mm" : ""}</text>`).join("");
     return `<section class="card">${kopf(n.text)}
       <svg class="chart" viewBox="0 -6 ${W} ${H + 24}" role="img" aria-label="Regen je 15 Minuten">${grid}${bars}</svg>
-      <p class="note">Je 15 Minuten, zusammen ${de(n.summe)} mm in 3 Stunden.</p>${zusatz}</section>`;
+      <p class="note">Je 15 Minuten, zusammen ${de(n.summe)} mm in 3 Stunden.</p></section>`;
   }
 
   const st = d.stunden.slice(0, 24);
   const f = d.heute.regenfenster.filter(x => x.von < st[st.length - 1].zeit);
   const nass = st.some(s => s.regen >= 0.1), moeglich = st.some(s => (s.regen_p90 || 0) >= 0.2);
-  if (!nass && !moeglich) return `<section class="card">${kopf("Trocken in den nächsten 24 Stunden")}${zusatz}</section>`;
-  const max = Math.max(2, ...st.map(s => Math.max(s.regen, s.regen_p90 || 0)));
-  const top = Math.ceil(max), H = 96, x0 = 4, bw = (W - 30 - x0) / 24, y = v => H - v / top * H;
+  if (!nass && !moeglich) return `<section class="card">${kopf("Trocken in den nächsten 24 Stunden")}</section>`;
+  const top = oben(Math.max(...st.map(s => Math.max(s.regen, s.regen_p90 || 0)))), H = 60, x0 = 4, bw = (W - 30 - x0) / 24, y = v => H - v / top * H;
   let bars = "", ticks = "";
   st.forEach((s, i) => {
     const x = x0 + i * bw, p90 = s.regen_p90 || 0;
@@ -549,7 +552,7 @@ function cardRegen(d) {
   }
   return `<section class="card">${kopf(lead)}
     <svg class="chart" viewBox="0 -6 ${W} ${H + 24}" role="img" aria-label="Niederschlag pro Stunde in Millimeter">${grid}${bars}${ticks}</svg>
-    <div class="legend"><span><i></i>Vorhersage</span><span><i class="maybe"></i>möglich</span></div>${zusatz}</section>`;
+    <div class="legend klein"><span><i></i>Vorhersage</span><span><i class="maybe"></i>möglich</span></div></section>`;
 }
 
 function cardWind(d) {
@@ -897,7 +900,7 @@ addEventListener("focus", frisch);
 addEventListener("online", frisch);
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611191327";
+const VERSION = "202611191625";
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
