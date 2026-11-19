@@ -66,6 +66,7 @@ try {
     const Wetter = new Function("fetch", "localStorage", "navigator", "window", "setTimeout", "clearTimeout", "AbortController", code + "\nreturn Wetter;")
       (fetch, localStorage, navigator, window, setTimeout, clearTimeout, AbortController);
     d = await Promise.race([Wetter.laden(null, { schnell: false }), warte(45000).then(() => null)]);   // im Widget auf den echten Standort warten
+    if (d && d.genau) { const g = await Promise.race([d.genau, warte(20000).then(() => null)]); if (g) d = g; else d.ersatz = "wien"; }   // Wien: genaue Vorhersage abwarten
     if (d && d.spaeter) await Promise.race([d.spaeter, warte(6000)]);       // Messwerte, falls schnell genug
     if (d) fm.writeString(datei("letzte.json"), JSON.stringify(d));
   }
@@ -289,7 +290,7 @@ if (!d) {
   info(rechts, "sunrise.fill", h.sonnenaufgang, farbe("#ffd866"));
   info(rechts, "sunset.fill", h.sonnenuntergang, farbe("#ffb070"));
   const alter = Math.round((Date.now() - new Date(d.stand).getTime()) / 60000);
-  if (d.ersatz) info(rechts, "exclamationmark.triangle.fill", d.ersatz === "alt" ? `GeoSphere ${d.geoStand.slice(11, 16)}` : "Open-Meteo", farbe("#ffb340"));
+  if (d.ersatz) info(rechts, "exclamationmark.triangle.fill", d.ersatz === "alt" ? `GeoSphere ${d.geoStand.slice(11, 16)}` : d.ersatz === "wien" ? "1010 Wien" : "Open-Meteo", farbe("#ffb340"));
   else info(rechts, "clock", alter < 1 ? "gerade" : alter < 60 ? `vor ${alter} min` : `Stand ${d.stand.slice(11, 16)}`, veraltet || alter > 45 ? farbe("#ffb340") : WEISS);
 
   w.addSpacer(3);

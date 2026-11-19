@@ -1,0 +1,31 @@
+# Holt alle 15 Minuten die GeoSphere Vorhersage fuer 1010 Wien und legt sie in den Zweig "daten".
+# Die App liest sie von raw.githubusercontent.com und zeigt sie sofort an.
+name: Vorrat Wien
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: vorrat
+  cancel-in-progress: true
+jobs:
+  holen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Letzten Stand holen
+        run: (git fetch -q --depth=1 origin daten && git show FETCH_HEAD:wien.json > alt.json) || echo "{}" > alt.json
+      - name: GeoSphere abfragen
+        run: mkdir -p neu && python3 werkzeug/vorrat.py alt.json neu/wien.json
+      - name: Ablegen
+        run: |
+          cd neu
+          git init -q -b daten
+          git config user.name "GigioWetter Vorrat"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add wien.json
+          git commit -qm "Vorrat $(date -u +%FT%TZ)"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" daten

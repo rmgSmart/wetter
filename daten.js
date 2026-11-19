@@ -114,6 +114,18 @@ const Wetter = (() => {
     return null;
   }
 
+  // Vorab geladene GeoSphere-Vorhersage fuer 1010 Wien: eine GitHub Action legt sie alle 15 Minuten in den Zweig "daten".
+  // Fuer ganz Wien wird sie sofort gezeigt, die Vorhersage fuer den genauen Standort kommt im Hintergrund nach.
+  const VORRAT = "https://raw.githubusercontent.com/rmgSmart/wetter/daten/wien.json";
+  const WIEN = { s: 48.11, n: 48.33, w: 16.18, e: 16.58 };
+  const inWien = (lat, lon) => lat > WIEN.s && lat < WIEN.n && lon > WIEN.w && lon < WIEN.e;
+  async function vorratHolen() {
+    const v = await hole(`${VORRAT}?t=${Math.floor(Date.now() / 3e5)}`, 5000, 0, 0);
+    const teil = (k, max) => { const x = v?.teile?.[k]; return x && Date.now() - x.t < max ? x.daten : null; };
+    const r = { t: v.t, nwp: teil("nwp", GEO_MAX), ens: teil("ens", 12 * 36e5), nc: teil("nc", 45 * 6e4), om: teil("om", GEO_MAX) };
+    return r.nwp && r.om ? r : null;
+  }
+
   /* ---------- Standort ---------- */
   // Fehlercodes: 0 nicht unterstuetzt, 1 abgelehnt, 2 nicht verfuegbar, 3 Zeitueberschreitung
   // iOS ruft bei Apps am Home-Bildschirm die Standortabfrage manchmal nie zurueck.
@@ -366,11 +378,30 @@ const Wetter = (() => {
   /* ---------- Ablauf ---------- */
   const OM_STD = "&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,snowfall,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,sunshine_duration,shortwave_radiation,cape,freezing_level_height";
   async function laden(wahl, opt = {}) {
+    let pos = wahl ? { lat: wahl.lat, lon: wahl.lon } : null;
+    if (!pos && opt.schnell !== false) { try { const g = JSON.parse(localStorage.getItem("pos")); if (g && g.lat != null) pos = { lat: g.lat, lon: g.lon }; } catch (e) {} }
+    else if (!pos) { const s = await standort(); opt = { ...opt, st: s }; if (s.lat != null) pos = s; }
+    const v = pos && inWien(pos.lat, pos.lon) ? await vorratHolen().catch(() => null) : null;
+    if (!v) return ladenDirekt(wahl, opt);
+    const d = await ladenDirekt(wahl, { ...opt, roh: v, st: opt.st || pos });
+    d.stand = iso(new Date(v.t));
+    // Genaue Vorhersage im Hintergrund; null, wenn GeoSphere dafuer nicht erreichbar war (dann bleibt die fuer 1010 Wien)
+    // Niemand wartet darauf, also geduldig abfragen
+    const genau = Promise.race([ladenDirekt(wahl, { ...opt, geduldig: true }), new Promise(r => setTimeout(r, 70000, null))])
+      .then(g => g && !g.ersatz ? g : null).catch(() => null);
+    genau.then(g => { if (!g) d.vorlaeufig = false; });
+    Object.defineProperty(d, "vorlaeufig", { value: true, writable: true, enumerable: false });
+    Object.defineProperty(d, "genau", { value: genau, enumerable: false });
+    return d;
+  }
+  async function ladenDirekt(wahl, opt = {}) {
+    const roh = opt.roh || null;
     // Standort: sofort den zuletzt bekannten nehmen und im Hintergrund pruefen, ob er noch stimmt.
     // Nur beim allerersten Start (oder im Widget) wird auf die Standortabfrage gewartet.
     let gespeichert = null; try { gespeichert = JSON.parse(localStorage.getItem("pos")); } catch (e) {}
     let st, standortNeu = null;
     if (wahl) st = { lat: wahl.lat, lon: wahl.lon };
+    else if (opt.st) st = opt.st;
     else if (opt.schnell !== false && gespeichert && gespeichert.lat != null) {
       st = { lat: gespeichert.lat, lon: gespeichert.lon };
       standortNeu = standort().then(p => p.lat != null && !p.alt && km(p.lat, p.lon, st.lat, st.lon) > 1).catch(() => false);
@@ -384,17 +415,18 @@ const Wetter = (() => {
       + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunshine_duration,uv_index_max&current=uv_index";
     const omStd = omBasis + OM_STD;
     const omUrl = imGebiet ? omBasis : omStd;
-    const messP = imGebiet ? messung(lat, lon).catch(() => null) : Promise.resolve(null), luftP = luft(lat, lon).catch(() => null);
+    const messP = roh ? Promise.resolve(null) : imGebiet ? messung(lat, lon).catch(() => null) : Promise.resolve(null), luftP = roh ? Promise.resolve(null) : luft(lat, lon).catch(() => null);
     // Ensemble (Regenwahrscheinlichkeit) und Nowcast sind oft langsam: nicht darauf warten, sondern nachreichen
-    const ensP = imGebiet ? hole(`${GEO}/ensemble-v2-1h-1km?${ll}&parameters=tp_p10,tp_p50,tp_p90,2t_p10,2t_p90,10fg_p90`).catch(() => null) : Promise.resolve(null);
-    const ncP = imGebiet ? hole(`${GEO}/nowcast-v1-15min-1km?${ll}&parameters=rr`, 20000).catch(() => null) : Promise.resolve(null);
+    const ensP = roh ? Promise.resolve(roh.ens) : imGebiet ? hole(`${GEO}/ensemble-v2-1h-1km?${ll}&parameters=tp_p10,tp_p50,tp_p90,2t_p10,2t_p90,10fg_p90`).catch(() => null) : Promise.resolve(null);
+    const ncP = roh ? Promise.resolve(roh.nc) : imGebiet ? hole(`${GEO}/nowcast-v1-15min-1km?${ll}&parameters=rr`, 20000).catch(() => null) : Promise.resolve(null);
     let ens = null, nc = null, ensDa = false, ncDa = false;
-    const ensP2 = ensP.then(x => { if (x) geoMerke("ens", lat, lon, x); else { const c = imGebiet ? geoAlt("ens", lat, lon) : null; if (c) return c.daten; } return x; });
+    const ensP2 = ensP.then(x => { if (roh) return x; if (x) geoMerke("ens", lat, lon, x); else { const c = imGebiet ? geoAlt("ens", lat, lon) : null; if (c) return c.daten; } return x; });
     ensP2.then(x => { ens = x; ensDa = true; }); ncP.then(x => { nc = x; ncDa = true; });
-    const vorrat = imGebiet ? geoAlt("nwp", lat, lon) : null, eilig = !!(vorrat && Date.now() - vorrat.t < 3 * 36e5);
-    let [nwp, om] = await Promise.all([imGebiet ? nwpHolen(ll, eilig) : null, hole(omUrl, 15000).catch(() => null)]);
+    const vorrat = imGebiet && !roh ? geoAlt("nwp", lat, lon) : null, eilig = !opt.geduldig && !!(vorrat && Date.now() - vorrat.t < 3 * 36e5);
+    let [nwp, om] = roh ? [roh.nwp, roh.om] : await Promise.all([imGebiet ? nwpHolen(ll, eilig) : null, hole(omUrl, 15000).catch(() => null)]);
     let geoStand = null;                                  // gesetzt, wenn eine aufgehobene GeoSphere-Vorhersage verwendet wird
-    if (imGebiet && nwp) geoMerke("nwp", lat, lon, nwp);
+    if (roh) {}
+    else if (imGebiet && nwp) geoMerke("nwp", lat, lon, nwp);
     else if (imGebiet) { const c = geoAlt("nwp", lat, lon); if (c) { nwp = c.daten; geoStand = new Date(c.t); } }
     await Promise.race([Promise.all([ensP2, ncP]), new Promise(r => setTimeout(r, 1200))]);   // kurz warten, falls sie gleich da sind
     let omH = null;
