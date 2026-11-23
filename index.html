@@ -168,6 +168,7 @@ svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
 
 footer { font-size: 12px; color: var(--soft); padding: 0 4px; }
 footer a { color: inherit; }
+footer .version { margin-top: 8px; opacity: .7; }
 
 .draft { border-style: dashed; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -385,8 +386,8 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611231459"></script>
-<script src="gigio.js?v=202611231459"></script>
+<script src="daten.js?v=202611231504"></script>
+<script src="gigio.js?v=202611231504"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -706,6 +707,7 @@ function render() {
   const cards = { astro: () => astroHTML, stunden: cardStunden, regen: cardRegen, wind: cardWind, details: cardDetails, woche: cardWoche };
   $("cards").innerHTML = orderFor(ch).map(k => cards[k](d)).join("") + (DEMO ? cardEntwurf() : "");
   $("fuss").innerHTML = `Daten: ${d.quellen.join(", ")}${d.standortFrei || d.gewaehlt ? ", Ortsname © OpenStreetMap" : ""}.` + (d.modelllauf ? ` Modelllauf ${new Date(d.modelllauf).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })} Uhr.` : "");
+  $("fuss").innerHTML += `<div class="version">GigioWetter Version ${NUMMER} vom ${VERSION.slice(6, 8)}.${VERSION.slice(4, 6)}.${VERSION.slice(0, 4)}, ${VERSION.slice(8, 10)}:${VERSION.slice(10, 12)} Uhr</div>`;
   const wl = nacht ? "nacht" : ["sonnig", "heiter", "hitze", "frost"].includes(ch) ? "sonne" : ch === "sturm" ? "wind" : "regen";
   Gigio.setWeather(wl);
   document.querySelectorAll("[data-rv]").forEach(b => b.onclick = () => { regenView = b.dataset.rv; render(); });
@@ -900,7 +902,8 @@ addEventListener("focus", frisch);
 addEventListener("online", frisch);
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611231459";
+const VERSION = "202611231504";
+const NUMMER = "1.64";                                  // wird von bump.sh hochgezaehlt
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
