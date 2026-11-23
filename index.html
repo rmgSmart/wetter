@@ -386,9 +386,11 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611231504"></script>
-<script src="gigio.js?v=202611231504"></script>
+<script src="daten.js?v=202611231522"></script>
+<script src="gigio.js?v=202611231522"></script>
 <script>
+const VERSION = "202611231522";                        // ganz oben, weil render() sie schon beim Start braucht
+const NUMMER = "1.65";                                  // wird von bump.sh hochgezaehlt
 "use strict";
 const $ = id => document.getElementById(id);
 const de = n => String(n).replace(".", ",");
@@ -902,8 +904,6 @@ addEventListener("focus", frisch);
 addEventListener("online", frisch);
 
 /* ---------- Neue Version erkennen ---------- */
-const VERSION = "202611231504";
-const NUMMER = "1.64";                                  // wird von bump.sh hochgezaehlt
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
