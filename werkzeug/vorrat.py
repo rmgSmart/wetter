@@ -51,7 +51,7 @@ def main():
     abrufe = {
         "nwp": nwp,
         "ens": lambda: hole(f"{GEO}/ensemble-v2-1h-1km?{LL}&parameters=tp_p10,tp_p50,tp_p90,2t_p10,2t_p90,10fg_p90"),
-        "nc": lambda: hole(f"{GEO}/nowcast-v1-15min-1km?{LL}&parameters=rr"),
+        "nc": lambda: hole(f"{GEO}/nowcast-v1-15min-1km?{LL}&parameters=rr,pt,t2m,td"),
         "om": lambda: hole(OM),
     }
     teile = {}

@@ -308,17 +308,30 @@ const Wetter = (() => {
     }
     return teile.map(t => t[0].toUpperCase() + t.slice(1)).join(". ") + ".";
   }
+  // Schnee oder Regen aus der Feuchttemperatur (Drittel-Regel): Schnee faellt oft noch bei 2 Grad, wenn die Luft trocken ist
+  function phase(t, td) {
+    if (t == null) return "regen";
+    const tw = td == null ? t : t - (t - td) / 3;
+    return tw <= 1.2 ? "schnee" : tw <= 2 ? "schneeregen" : "regen";
+  }
+  const ART_WORT = { regen: "Regen", schnee: "Schnee", schneeregen: "Schneeregen" };
   function nowcast(gj, jetzt, aktuell) {
-    const st = reihe(gj).filter(x => x.t > jetzt && x.v.rr != null).slice(0, 12).map(x => ({ zeit: iso(x.t), regen: Math.round(x.v.rr * 100) / 100, d: x.t }));
+    const st = reihe(gj).filter(x => x.t > jetzt && x.v.rr != null).slice(0, 12)
+      .map(x => ({ zeit: iso(x.t), regen: Math.round(x.v.rr * 100) / 100, d: x.t, art: phase(x.v.t2m, x.v.td), pt: x.v.pt ?? null }));
     if (!st.length) return null;
     const nass = st.map((s, i) => s.regen >= .05 ? i : -1).filter(i => i >= 0);
+    const arten = nass.map(i => st[i].art), art = arten.includes("schnee") ? (arten.every(a => a === "schnee") ? "schnee" : "schneeregen")
+      : arten.includes("schneeregen") ? "schneeregen" : nass.length ? "regen" : null;
+    const W = ART_WORT[art] || "Regen";
     const ende = i => uhr(st[i].d), beginn = i => uhr(new Date(st[i].d - 9e5));
     let text, b = null, e = null;
-    if (!nass.length) text = "Kein Regen bis " + ende(st.length - 1);
-    else if (nass[0] > 0) { b = beginn(nass[0]); text = aktuell.regen >= .1 ? `Leichtes Nieseln, kräftiger ab etwa ${b}` : `Regen ab etwa ${b}`; }
-    else { const i = st.findIndex((s, k) => !nass.includes(k)); if (i > 0) { e = ende(i - 1); text = `Regen bis etwa ${e}`; } else text = `Regen hält bis mindestens ${ende(st.length - 1)} an`; }
-    return { modelllauf: gj.reference_time, text, regnet: nass.length > 0, beginn: b, ende: e,
-             summe: Math.round(st.reduce((a, s) => a + s.regen, 0) * 10) / 10, schritte: st.map(({ zeit, regen }) => ({ zeit, regen })) };
+    if (!nass.length) text = "Kein Niederschlag bis " + ende(st.length - 1);
+    else if (nass[0] > 0) { b = beginn(nass[0]); text = aktuell.regen >= .1 && art === "regen" ? `Leichtes Nieseln, kräftiger ab etwa ${b}` : `${W} ab etwa ${b}`; }
+    else { const i = st.findIndex((s, k) => !nass.includes(k)); if (i > 0) { e = ende(i - 1); text = `${W} bis etwa ${e}`; } else text = `${W} hält bis mindestens ${ende(st.length - 1)} an`; }
+    // Faellt gerade etwas? Erste halbe Stunde des Nowcasts (INCA: Radar und Stationen)
+    const jetztNass = st.slice(0, 2).some(s => s.regen >= .05), jetztArt = jetztNass ? st.slice(0, 2).find(s => s.regen >= .05).art : null;
+    return { modelllauf: gj.reference_time, text, regnet: nass.length > 0, art, jetztNass, jetztArt, jetztMenge: r1(st.slice(0, 4).reduce((a, s) => a + s.regen, 0)), beginn: b, ende: e,
+             summe: Math.round(st.reduce((a, s) => a + s.regen, 0) * 10) / 10, schritte: st.map(({ zeit, regen, art, pt }) => ({ zeit, regen, art, pt })) };
   }
 
   /* ---------- Zusammenbauen ---------- */
@@ -366,8 +379,17 @@ const Wetter = (() => {
     const trend = d0 != null && d3 != null ? (d3 - d0 > 1 ? "steigend" : d3 - d0 < -1 ? "fallend" : "gleichbleibend") : null;
     const t24 = kommend.slice(0, 24), gr = t24.map(s => s.schneefallgrenze).filter(x => x != null);
     let nc = null; try { if (ncRoh) nc = nowcast(ncRoh, jetzt, aktuell); } catch (e) {}
+    let ch = charakter(rest, t0.max);
+    if (nc && nc.jetztNass) {             // das Modell kann danebenliegen, der Nowcast sieht den Niederschlag am Radar
+      const m = nc.jetztMenge, a = nc.jetztArt;
+      const [sym, txt] = a === "schnee" ? ["schnee", m >= .5 ? "Schneefall" : "Leichter Schneefall"] : a === "schneeregen" ? ["schneeregen", "Schneeregen"]
+        : [m >= .5 ? "regen" : "regen_leicht", m >= .5 ? "Regen" : "Leichter Regen"];
+      if (!NASS.has(aktuell.symbol) || a !== "regen") Object.assign(aktuell, { symbol: sym, text: txt });
+      aktuell.regen = Math.max(aktuell.regen || 0, m);
+      if (ch !== "gewitter" && ch !== "sturm") ch = a === "regen" ? (ch === "schnee" ? ch : "regen") : "schnee";
+    }
     return {
-      ort, koordinaten: [lat, lon], stand: iso(jetzt), modelllauf: lauf, charakter: charakter(rest, t0.max), nacht: !(auf <= jetzt && jetzt <= unter), jetzt: aktuell,
+      ort, koordinaten: [lat, lon], stand: iso(jetzt), modelllauf: lauf, charakter: ch, nacht: !(auf <= jetzt && jetzt <= unter), jetzt: aktuell,
       heute: { min: t0.min, max: t0.max, regen_rest: r1(rest.reduce((a, s) => a + s.regen, 0)), regenrisiko: stufen.length ? stufen.reduce((a, c) => ord.indexOf(c) > ord.indexOf(a) ? c : a) : null,
                regenfenster: fenster, boe_max: boeRest, sonne_h: t0.sonne_h, sonnenaufgang: uhr(auf), sonnenuntergang: uhr(unter), satz: satz(jetzt, rest, fenster, t0.max, boeRest, kommend.slice(0, 24)),
                drucktrend: trend, arten_24h: arten(t24), schneefallgrenze_24h: gr.length ? [Math.min(...gr), Math.max(...gr)] : null },
@@ -383,12 +405,19 @@ const Wetter = (() => {
     else if (!pos) { const s = await standort(); opt = { ...opt, st: s }; if (s.lat != null) pos = s; }
     const v = pos && inWien(pos.lat, pos.lon) ? await vorratHolen().catch(() => null) : null;
     if (!v) return ladenDirekt(wahl, opt);
+    // Standort gleich jetzt pruefen, die genaue Vorhersage wird dann fuer den aktuellen Standort geholt
+    const stP = wahl || opt.st ? Promise.resolve(opt.st || null) : standort();
     const d = await ladenDirekt(wahl, { ...opt, roh: v, st: opt.st || pos });
     d.stand = iso(new Date(v.t));
-    // Genaue Vorhersage im Hintergrund; null, wenn GeoSphere dafuer nicht erreichbar war (dann bleibt die fuer 1010 Wien)
-    // Niemand wartet darauf, also geduldig abfragen
-    const genau = Promise.race([ladenDirekt(wahl, { ...opt, geduldig: true }), new Promise(r => setTimeout(r, 70000, null))])
-      .then(g => g && !g.ersatz ? g : null).catch(() => null);
+    // Genaue Vorhersage im Hintergrund; niemand wartet darauf, also geduldig abfragen.
+    // null, wenn GeoSphere dafuer nicht erreichbar war (dann bleibt die fuer 1010 Wien), ausser man ist inzwischen woanders.
+    let woanders = false;
+    const genau = Promise.race([stP.then(s => {
+        const st = wahl ? null : s && s.lat != null ? s : pos;
+        if (st && km(st.lat, st.lon, pos.lat, pos.lon) > 1) woanders = true;
+        return ladenDirekt(wahl, { ...opt, geduldig: true, ...(st ? { st } : {}) });
+      }), new Promise(r => setTimeout(r, 70000, null))])
+      .then(g => g && (!g.ersatz || woanders) ? g : null).catch(() => null);
     genau.then(g => { if (!g) d.vorlaeufig = false; });
     Object.defineProperty(d, "vorlaeufig", { value: true, writable: true, enumerable: false });
     Object.defineProperty(d, "genau", { value: genau, enumerable: false });
@@ -418,7 +447,7 @@ const Wetter = (() => {
     const messP = roh ? Promise.resolve(null) : imGebiet ? messung(lat, lon).catch(() => null) : Promise.resolve(null), luftP = roh ? Promise.resolve(null) : luft(lat, lon).catch(() => null);
     // Ensemble (Regenwahrscheinlichkeit) und Nowcast sind oft langsam: nicht darauf warten, sondern nachreichen
     const ensP = roh ? Promise.resolve(roh.ens) : imGebiet ? hole(`${GEO}/ensemble-v2-1h-1km?${ll}&parameters=tp_p10,tp_p50,tp_p90,2t_p10,2t_p90,10fg_p90`).catch(() => null) : Promise.resolve(null);
-    const ncP = roh ? Promise.resolve(roh.nc) : imGebiet ? hole(`${GEO}/nowcast-v1-15min-1km?${ll}&parameters=rr`, 20000).catch(() => null) : Promise.resolve(null);
+    const ncP = roh ? Promise.resolve(roh.nc) : imGebiet ? hole(`${GEO}/nowcast-v1-15min-1km?${ll}&parameters=rr,pt,t2m,td`, 20000).catch(() => null) : Promise.resolve(null);
     let ens = null, nc = null, ensDa = false, ncDa = false;
     const ensP2 = ensP.then(x => { if (roh) return x; if (x) geoMerke("ens", lat, lon, x); else { const c = imGebiet ? geoAlt("ens", lat, lon) : null; if (c) return c.daten; } return x; });
     ensP2.then(x => { ens = x; ensDa = true; }); ncP.then(x => { nc = x; ncDa = true; });
