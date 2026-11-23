@@ -1,0 +1,30 @@
+name: Probe
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python3 - <<'PY'
+          import json, urllib.request, time
+          def h(u):
+              for i in range(4):
+                  try:
+                      return json.load(urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "GigioWetter/1.0"}), timeout=60))
+                  except Exception as e:
+                      print("  fehler", e); time.sleep(5)
+          B = "https://dataset.api.hub.geosphere.at/v1"
+          m = h(B + "/timeseries/forecast/nowcast-v1-15min-1km/metadata")
+          print("NOWCAST", [(p["name"], p.get("long_name"), p.get("unit")) for p in m["parameters"]] if m else None)
+          m = h(B + "/station/historical/tawes-v1-10min/metadata")
+          print("TAWES", [p["name"] for p in m["parameters"]] if m else None)
+          print("TAWES-SCHNEE", [(p["name"], p.get("long_name")) for p in (m or {}).get("parameters", []) if any(w in (p.get("long_name","")+p["name"]).lower() for w in ["schnee","snow","sch","ww","wetter","niederschlagsart"])])
+          for st in ["11034", "11035", "11036"]:
+              j = h(f"{B}/station/historical/tawes-v1-10min?parameters=TL,RR,RF&station_ids={st}&start=2026-11-22T18:00&end=2026-11-23T14:00&output_format=geojson")
+              if not j: continue
+              p = j["features"][0]["properties"]["parameters"]
+              print("STATION", st)
+              for i, t in enumerate(j["timestamps"]):
+                  rr = p["RR"]["data"][i]
+                  if rr and rr > 0: print(" ", t, "TL", p["TL"]["data"][i], "RR", rr)
+          PY
