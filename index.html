@@ -386,11 +386,11 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611231522"></script>
-<script src="gigio.js?v=202611231522"></script>
+<script src="daten.js?v=202611241001"></script>
+<script src="gigio.js?v=202611241001"></script>
 <script>
-const VERSION = "202611231522";                        // ganz oben, weil render() sie schon beim Start braucht
-const NUMMER = "1.65";                                  // wird von bump.sh hochgezaehlt
+const VERSION = "202611241001";                        // ganz oben, weil render() sie schon beim Start braucht
+const NUMMER = "1.66";                                  // wird von bump.sh hochgezaehlt
 "use strict";
 const $ = id => document.getElementById(id);
 const de = n => String(n).replace(".", ",");
@@ -609,8 +609,8 @@ function cardDetails(d) {
 
 // Farbton je Wetterlage fuer die Wochenzeilen: [R,G,B], Deckkraft
 const TINT = { klar: ["255,196,60", .42], heiter: ["255,208,96", .34], wolkig: ["214,224,236", .2], bedeckt: ["120,132,146", .3], nebel: ["176,182,188", .3],
-               regen_leicht: ["84,160,255", .26], regen: ["64,146,255", .4], regen_stark: ["40,120,255", .55], schneeregen: ["150,200,255", .4],
-               schnee: ["232,244,255", .45], gewitter: ["160,120,255", .5] };
+               regen_leicht: ["84,160,255", .26], regen: ["64,146,255", .4], regen_stark: ["40,120,255", .55], schneeregen: ["104,150,214", .42],
+               schnee: ["92,122,176", .46], gewitter: ["160,120,255", .5] };
 // Farbe eines Tages aus den Werten: Regenmenge zuerst, sonst Anteil der Sonnenstunden am Tageslicht
 function tagesfarbe(w) {
   if (w.symbol === "gewitter") return TINT.gewitter;
