@@ -358,6 +358,31 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
 :root[data-theme="bunt"][data-zeit="abend"] .sky::after { background: linear-gradient(180deg, rgba(60,40,140,.35) 0%, rgba(230,80,120,.5) 62%, rgba(255,150,80,.72) 100%); }
 :root[data-theme="bunt"][data-zeit="morgen"]:is([data-sky="sonnig"],[data-sky="heiter"],[data-sky="bewoelkt"],[data-sky="nacht-klar"],[data-sky="nacht-trueb"]) .sky::after,
 :root[data-theme="bunt"][data-zeit="abend"]:is([data-sky="sonnig"],[data-sky="heiter"],[data-sky="bewoelkt"],[data-sky="nacht-klar"],[data-sky="nacht-trueb"]) .sky::after { opacity: 1; }
+
+/* ---------- Klassisch: dunkler, nach Apple Wetter im Dunkelmodus ----------
+   Himmel satt und dunkel je nach Wetter, Karten als dunkles Glas, Apple Systemfarben (Dunkelmodus).
+   Klassisch hat kein data-theme, daher :not([data-theme]). */
+:root:not([data-theme]) {
+  color-scheme: dark; --ink: #ffffff; --soft: rgba(235,240,245,.7);
+  --panel: rgba(6,14,28,.42); --line: rgba(255,255,255,.12); --glass-edge: rgba(255,255,255,.14); --lift: rgba(255,255,255,.08);
+  --accent: #ffd60a; --wet: #64d2ff;
+  --wolke: #eef2f7; --wolke2: #b9c4d1; --wolke3: #b4a8ec; --tropfen: #64d2ff; --flocke: #ffffff;
+}
+:root:not([data-theme])[data-sky="sonnig"]       { --sky-a:#0a3a8c; --sky-b:#2a6cc0; }
+:root:not([data-theme])[data-sky="heiter"]       { --sky-a:#143c74; --sky-b:#3a6aa4; }
+:root:not([data-theme])[data-sky="bewoelkt"]     { --sky-a:#27323f; --sky-b:#4a5866; }
+:root:not([data-theme])[data-sky="regen"]        { --sky-a:#18222d; --sky-b:#33424f; }
+:root:not([data-theme])[data-sky="gewitter"]     { --sky-a:#15122a; --sky-b:#352f50; }
+:root:not([data-theme])[data-sky="sturm"]        { --sky-a:#172632; --sky-b:#37505d; --accent:#7ee8c8; }
+:root:not([data-theme])[data-sky="hitze"]        { --sky-a:#6e2010; --sky-b:#ad541c; --accent:#ffd60a; }
+:root:not([data-theme])[data-sky="schnee"]       { --sky-a:#2c3c52; --sky-b:#5f7390; --accent:#ffffff; }
+:root:not([data-theme])[data-sky="nebel"]        { --sky-a:#30363c; --sky-b:#5a6168; }
+:root:not([data-theme])[data-sky="frost"]        { --sky-a:#123a5c; --sky-b:#3d6d94; --accent:#9fe6ff; }
+:root:not([data-theme])[data-sky="nacht-klar"]   { --sky-a:#050a1c; --sky-b:#1a2550; }
+:root:not([data-theme])[data-sky="nacht-trueb"]  { --sky-a:#10151c; --sky-b:#2a323d; }
+:root:not([data-theme])[data-sky="nacht-regen"]  { --sky-a:#0b1119; --sky-b:#212c39; }
+:root:not([data-theme])[data-sky="nacht-schnee"] { --sky-a:#131d30; --sky-b:#3c4b63; --accent:#ffffff; }
+:root:not([data-theme]) .card { box-shadow: inset 0 .5px 0 var(--glass-edge), 0 10px 30px rgba(0,0,0,.22); }
 </style>
 </head>
 <body>
@@ -386,11 +411,11 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611241113"></script>
-<script src="gigio.js?v=202611241113"></script>
+<script src="daten.js?v=202611241115"></script>
+<script src="gigio.js?v=202611241115"></script>
 <script>
-const VERSION = "202611241113";                        // ganz oben, weil render() sie schon beim Start braucht
-const NUMMER = "1.69";                                  // wird von bump.sh hochgezaehlt
+const VERSION = "202611241115";                        // ganz oben, weil render() sie schon beim Start braucht
+const NUMMER = "1.70";                                  // wird von bump.sh hochgezaehlt
 "use strict";
 const $ = id => document.getElementById(id);
 const de = n => String(n).replace(".", ",");
