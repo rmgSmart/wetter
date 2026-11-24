@@ -12,7 +12,9 @@ UA = "GigioWetter/1.0 (https://rmgsmart.github.io/wetter/)"
 ZUSATZ = ["sund", "sf", "pt", "snowlmt", "msl", "ssrd", "cape"]
 OM = (f"https://api.open-meteo.com/v1/forecast?latitude={LAT:.4f}&longitude={LON:.4f}&timezone=auto&forecast_days=8"
       "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,"
-      "wind_gusts_10m_max,sunshine_duration,uv_index_max&current=uv_index")
+      "wind_gusts_10m_max,sunshine_duration,uv_index_max&current=uv_index"
+      "&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,snowfall,weather_code,cloud_cover,pressure_msl,"
+      "wind_speed_10m,wind_direction_10m,wind_gusts_10m,sunshine_duration,shortwave_radiation,cape,freezing_level_height")
 
 
 def hole(url, versuche=3):

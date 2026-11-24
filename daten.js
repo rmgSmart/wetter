@@ -443,7 +443,7 @@ const Wetter = (() => {
     const omBasis = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&timezone=auto&forecast_days=8`
       + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunshine_duration,uv_index_max&current=uv_index";
     const omStd = omBasis + OM_STD;
-    const omUrl = imGebiet ? omBasis : omStd;
+    const omUrl = omStd;                                  // stuendlich auch in Oesterreich: fuellt den Tag auf, an dem die GeoSphere-Vorhersage endet
     const messP = roh ? Promise.resolve(null) : imGebiet ? messung(lat, lon).catch(() => null) : Promise.resolve(null), luftP = roh ? Promise.resolve(null) : luft(lat, lon).catch(() => null);
     // Ensemble (Regenwahrscheinlichkeit) und Nowcast sind oft langsam: nicht darauf warten, sondern nachreichen
     const ensP = roh ? Promise.resolve(roh.ens) : imGebiet ? hole(`${GEO}/ensemble-v2-1h-1km?${ll}&parameters=tp_p10,tp_p50,tp_p90,2t_p10,2t_p90,10fg_p90`).catch(() => null) : Promise.resolve(null);
@@ -469,6 +469,12 @@ const Wetter = (() => {
         stunden = omH ? stundenOM(omH, lat, lon).filter(s => new Date(s.zeit) > Date.now() - 36e5).slice(0, 60) : []; quellen = ["Open-Meteo (CC BY 4.0)"]; lauf = null;
       }
       if (!stunden.length) throw new Error("Keine Wetterdaten erreichbar");
+      // GeoSphere rechnet rund 60 Stunden voraus und hoert mitten im Tag auf: den Rest dieses Tages mit Open-Meteo auffuellen
+      if (nwp && om?.hourly) {
+        const ende = stunden[stunden.length - 1].zeit, tagEnde = ende.slice(0, 10);
+        const rest = stundenOM(om, lat, lon).filter(s => s.zeit > ende && s.zeit.slice(0, 10) === tagEnde).map(s => ({ ...s, quelle: "Open-Meteo" }));
+        if (rest.length) { stunden = stunden.concat(rest); quellen = [...quellen, "Open-Meteo (CC BY 4.0)"]; }
+      }
       const d = baue(stunden, om?.daily || null, jetzt, ort, lat, lon, quellen, lauf, ncX);
       d.standortFrei = !!pos && !st.alt; d.standortAlt = !!st.alt; d.standortFehler = d.standortFrei ? null : st.fehler; d.gewaehlt = !!wahl;
       const uvTage = {}; (om?.daily?.time || []).forEach((t, i) => { const u = om.daily.uv_index_max?.[i]; if (u != null) uvTage[t] = Math.round(u); });
