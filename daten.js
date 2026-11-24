@@ -476,6 +476,9 @@ const Wetter = (() => {
         if (rest.length) { stunden = stunden.concat(rest); quellen = [...quellen, "Open-Meteo (CC BY 4.0)"]; }
       }
       const d = baue(stunden, om?.daily || null, jetzt, ort, lat, lon, quellen, lauf, ncX);
+      // Stundenwerte fuer die spaeteren Tage, nur fuer die Tagesdetails (die Tageszeilen kommen weiter aus den Tageswerten)
+      const omQ = om?.hourly ? om : omH, letzterTag = stunden[stunden.length - 1].zeit.slice(0, 10);
+      d.weitere = omQ ? stundenOM(omQ, lat, lon).filter(s => s.zeit.slice(0, 10) > letzterTag).map(s => ({ ...s, quelle: "Open-Meteo" })) : [];
       d.standortFrei = !!pos && !st.alt; d.standortAlt = !!st.alt; d.standortFehler = d.standortFrei ? null : st.fehler; d.gewaehlt = !!wahl;
       const uvTage = {}; (om?.daily?.time || []).forEach((t, i) => { const u = om.daily.uv_index_max?.[i]; if (u != null) uvTage[t] = Math.round(u); });
       d.woche.forEach(w => { w.uv = uvTage[w.datum] ?? null; w.uv_text = uvText(w.uv); w.luft = null; });
