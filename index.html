@@ -105,7 +105,7 @@ footer { text-align: center; }
 .hours { display: flex; gap: 0; overflow-x: auto; margin: 8px 0 0; padding: 0; border-radius: 14px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
          overscroll-behavior-x: none; }   /* am Anfang und Ende nicht nachfedern, sonst wird daneben eine leere Flaeche sichtbar */
 .hours::-webkit-scrollbar { display: none; }
-.hour { flex: 0 0 54px; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 0 6px;
+.hour { flex: 0 0 54px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 0 6px;
         background: linear-gradient(180deg, rgba(var(--tint), var(--ta)), rgba(var(--tint), calc(var(--ta) * .3))); font-variant-numeric: tabular-nums; }
 .hour .h { font-size: 13px; color: var(--soft); }
 .hour.now .h { color: var(--ink); font-weight: 600; }
@@ -464,11 +464,11 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611251642"></script>
-<script src="gigio.js?v=202611251642"></script>
+<script src="daten.js?v=202611251708"></script>
+<script src="gigio.js?v=202611251708"></script>
 <script>
-const VERSION = "202611251642";                        // ganz oben, weil render() sie schon beim Start braucht
-const NUMMER = "1.78";                                  // wird von bump.sh hochgezaehlt
+const VERSION = "202611251708";                        // ganz oben, weil render() sie schon beim Start braucht
+const NUMMER = "1.79";                                  // wird von bump.sh hochgezaehlt
 "use strict";
 const $ = id => document.getElementById(id);
 const de = n => String(n).replace(".", ",");
@@ -592,7 +592,7 @@ function cardStunden(d) {
   const st = d.stunden.slice(0, 25); if (!st.length) return "";
   let prev = st[0].zeit.slice(0, 10); const neu = st.map(s => { const n = s.zeit.slice(0, 10) !== prev; prev = s.zeit.slice(0, 10); return n; });
   const t = st.map(s => s.temp), bmax = Math.max(...st.map(s => s.boe));
-  return `<section class="card"><h2>Nächste 24 Stunden</h2><p class="lead">${grad(Math.min(...t))} bis ${grad(Math.max(...t))}<small>Böen bis ${bmax} km/h</small></p>${leiste(st, (s, i) => i === 0 ? "Jetzt" : neu[i] ? wtag(s.zeit) + " " + hh(s.zeit) : hh(s.zeit) + " Uhr", (s, i) => (i === 0 ? " now" : "") + (neu[i] ? " newday" : ""))}<p class="note">Unterste Zeile: Böen in km/h mit Windrichtung.</p></section>`;
+  return `<section class="card"><h2>Nächste 24 Stunden</h2><p class="lead">${grad(Math.min(...t))} bis ${grad(Math.max(...t))}<small>Böen bis ${bmax} km/h</small></p>${leiste(st, (s, i) => i === 0 ? "Jetzt" : (neu[i] ? wtag(s.zeit) + " " : "") + hh(s.zeit) + " Uhr", (s, i) => (i === 0 ? " now" : "") + (neu[i] ? " newday" : ""))}<p class="note">Unterste Zeile: Böen in km/h mit Windrichtung.</p></section>`;
 }
 
 function cardRegen(d) {
@@ -635,16 +635,18 @@ function cardRegen(d) {
   const grid = [0, top / 2, top].map(v => `<line x1="${x0}" x2="${W - 28}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${W}" y="${y(v) + 3.5}" text-anchor="end">${de(v)}${v === top ? " mm" : ""}</text>`).join("");
   let lead = "Niederschlag möglich, aber unsicher";
   if (f.length) {
-    const a = f[0], von = hh(a.von), bis = hh(a.bis);
-    const wort = ART_NAME[a.art] || "Niederschlag";
-    // Tage relativ zu heute: "von 9 bis 14 Uhr", "von 21 bis 3 Uhr früh", "ab 21 Uhr bis morgen 22 Uhr", "bis mindestens morgen 22 Uhr"
-    const tg = x => Math.round((new Date(x.slice(0, 10) + "T12:00") - new Date(d.stand.slice(0, 10) + "T12:00")) / 864e5);
-    const tw = n => n === 1 ? "morgen " : n >= 2 ? "übermorgen " : "", tv = tg(a.von), tb = tg(a.bis);
-    if (a.offen) lead = a.von <= d.stand ? `${wort} bis mindestens ${tw(tb)}${bis} Uhr` : `${wort} ${tw(tv)}ab ${von} Uhr, bis mindestens ${tw(tb)}${bis} Uhr`;
-    else if (a.von <= d.stand) lead = tb === 1 && bis <= 9 ? `${wort} bis ${bis} Uhr früh` : `${wort} bis ${tw(tb)}${bis} Uhr`;
-    else if (tb === tv) lead = `${wort} ${tw(tv)}von ${von} bis ${bis} Uhr`;
-    else if (tb === tv + 1 && bis <= 9) lead = `${wort} ${tw(tv)}von ${von} bis ${bis} Uhr früh`;
-    else lead = `${wort} ${tw(tv)}ab ${von} Uhr bis ${tw(tb)}${bis} Uhr`;
+    const a = f[0], wort = ART_NAME[a.art] || "Niederschlag", ref = d.erstellt || d.stand, r = new Date(ref);
+    // Zeitpunkt relativ zum Stand: Tage ab heute, 0 Uhr ist Mitternacht am Ende des Vortags.
+    // "von 9 bis 14 Uhr", "von 22 Uhr bis Mitternacht", "von 21 bis 3 Uhr früh", "ab 21 Uhr bis morgen 22 Uhr", "bis mindestens morgen 22 Uhr"
+    const zp = x => { const t = new Date(x), h = hh(x), n = Math.round((new Date(x.slice(0, 10) + "T12:00") - new Date(ref.slice(0, 10) + "T12:00")) / 864e5) - (h ? 0 : 1);
+      return { t, h, n, uhr: h ? h + " Uhr" : "Mitternacht", zahl: h ? String(h) : "Mitternacht" }; };
+    const tw = n => n === 1 ? "morgen " : n >= 2 ? "übermorgen " : "", v = zp(a.von), b = zp(a.bis), laeuft = v.t <= r;
+    const frueh = (ab, n) => b.n === n && b.h >= 1 && b.h <= 9 && b.t - ab < 12 * 36e5;   // endet in der kommenden Nacht oder am fruehen Morgen
+    if (a.offen) lead = laeuft ? `${wort} bis mindestens ${tw(b.n)}${b.uhr}` : `${wort} ${tw(v.n)}ab ${v.uhr}, bis mindestens ${tw(b.n)}${b.uhr}`;
+    else if (laeuft) lead = frueh(r, 1) ? `${wort} bis ${b.h} Uhr früh` : `${wort} bis ${tw(b.n)}${b.uhr}`;
+    else if (b.n === v.n) lead = `${wort} ${tw(v.n)}von ${b.h ? v.zahl : v.uhr} bis ${b.uhr}`;
+    else if (frueh(v.t, v.n + 1)) lead = `${wort} ${tw(v.n)}von ${v.zahl} bis ${b.h} Uhr früh`;
+    else lead = `${wort} ${tw(v.n)}ab ${v.uhr} bis ${tw(b.n)}${b.uhr}`;
     lead += `, ${de(a.menge)} mm`;
   }
   return `<section class="card" data-karte="regen">${kopf(lead)}
@@ -660,7 +662,8 @@ function cardWind(d) {
   const imax = st.findIndex(s => s.boe === mx);
   const ticks = st.map((s, i) => hh(s.zeit) % 3 === 0 ? `<text x="${x0 + i * xw}" y="${H + 14}" text-anchor="middle">${hh(s.zeit)}</text>` : "").join("");
   const grid = [0, top / 2, top].map(v => `<line x1="${x0}" x2="${W - 32}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${W}" y="${y(v) + 3.5}" text-anchor="end">${v}${v === top ? " km/h" : ""}</text>`).join("");
-  return `<section class="card"><h2>Wind, nächste 24 Stunden</h2><p class="lead">Böen bis ${mx} km/h um ${hh(st[imax].zeit)} Uhr</p>
+  const lead = imax === 0 ? `Jetzt Böen bis ${mx} km/h` : `Böen bis ${mx} km/h ${Wetter.umWann(new Date(st[imax].zeit), new Date(d.erstellt || d.stand))}`;   // "in der Nacht um 3 Uhr", "morgen um 13 Uhr"
+  return `<section class="card"><h2>Wind, nächste 24 Stunden</h2><p class="lead">${lead}</p>
     <svg class="chart" viewBox="0 -6 ${W} ${H + 24}" role="img" aria-label="Böen und Wind in km/h">${grid}
     <path d="${line("boe")} L${x0 + 23 * xw} ${H} L${x0} ${H}Z" fill="var(--accent)" opacity=".16"/>
     <path d="${line("boe")}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
@@ -679,13 +682,14 @@ function cardDetails(d) {
   if (m && m.wind != null) t.push(tile("Wind gemessen", m.wind, "km/h" + (m.richtung != null && m.wind > 2 ? " aus " + ri(m.richtung) : "")));
   else t.push(tile("Wind", j.wind, "km/h aus " + ri(j.richtung)));
   t.push(tile(m && m.boe != null ? "Böen gemessen" : "Böen jetzt", m && m.boe != null ? m.boe : j.boe, "km/h"));
-  t.push(tile("Böen bis Mitternacht", h.boe_max, "km/h"));
+  const bis = "bis " + (h.rest_bis || "Mitternacht");                 // spaet am Abend die naechsten 6 Stunden, z. B. "bis 4 Uhr"
+  t.push(tile(`Böen ${bis}`, h.boe_max, "km/h"));
   t.push(tile("Luftfeuchte", m && m.feuchte != null ? m.feuchte : j.feuchte, "%"));
   t.push(tile("Taupunkt", grad(m && m.taupunkt != null ? m.taupunkt : j.taupunkt)));
   t.push(tile("Bewölkung", j.wolken, "%"));
   const druck = m && m.druck != null ? m.druck : j.druck;
   t.push(tile("Luftdruck", druck != null ? Math.round(druck) : "?", "hPa" + (h.drucktrend ? ", " + h.drucktrend : "")));
-  t.push(tile("Niederschlag bis Mitternacht", de(h.regen_rest), "mm"));
+  t.push(tile(`Niederschlag ${bis}`, de(h.regen_rest), "mm"));
   if (j.risiko_prozent != null) t.push(tile("Niederschlagsrisiko jetzt", `<span class="klein">${risikoWort(j.risiko_prozent)}</span>`));
   t.push(tile("Sonnenschein heute", de(h.sonne_h), "Stunden"));
   if (d.uv) t.push(tile("UV-Index heute", d.uv.max ?? d.uv.jetzt, d.uv.text + (d.uv.jetzt != null && d.uv.max != null && !d.nacht ? ", jetzt " + d.uv.jetzt : "")));

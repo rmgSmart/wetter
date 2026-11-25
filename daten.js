@@ -292,44 +292,87 @@ const Wetter = (() => {
   const WORT = { regen: ["Etwas Regen", "Regen", "Starker Regen"], schnee: ["Etwas Schnee", "Schneefall", "Starker Schneefall"],
                  schneeregen: ["Etwas Schneeregen", "Schneeregen", "Starker Schneeregen"] };
   const NOMEN = { regen: "Regen", schnee: "Schnee", schneeregen: "Schneeregen" };
-  // Ende eines Niederschlags in Worten: heute, in der Nacht, morgen frueh, morgen Abend, oder offen
+  // Zeitangaben in Worten. 0 Uhr ist Mitternacht und gehoert zum Tag davor ("bis Mitternacht", nicht "bis morgen 0 Uhr").
+  // "In der Nacht" nur fuer die kommende Nacht, also weniger als 12 Stunden voraus.
+  const tageVon = (d, ref) => Math.round((new Date(tag(d) + "T12:00") - new Date(tag(ref) + "T12:00")) / 864e5);
+  const tageWort = n => n === 1 ? "morgen " : n >= 2 ? "übermorgen " : "";
+  const nachts = (t, jetzt) => tageVon(t, jetzt) === 1 && t.getHours() >= 1 && t.getHours() <= 5 && t - jetzt < 12 * 36e5;
+  // Ende eines Niederschlags: heute, gegen Mitternacht, in der Nacht, morgen frueh, morgen Abend, oder offen
   function bisWann(bis, jetzt, offen) {
-    const tage = Math.round((new Date(tag(bis) + "T12:00") - new Date(tag(jetzt) + "T12:00")) / 864e5), h = bis.getHours(), z = `${h} Uhr`;
-    const wtag = tage === 1 ? "morgen " : tage >= 2 ? "übermorgen " : "";
-    if (offen) return `bis mindestens ${wtag}${z}`;
+    const h = bis.getHours(), mn = h === 0, tage = tageVon(bis, jetzt) - (mn ? 1 : 0), z = mn ? "Mitternacht" : `${h} Uhr`;
+    if (offen) return `bis mindestens ${tageWort(tage)}${z}`;
+    if (mn) return `bis ${tageWort(tage)}gegen Mitternacht`;
     if (tage <= 0) return `bis etwa ${z}`;
-    if (tage === 1) return h <= 5 ? `in der Nacht bis etwa ${z}` : h <= 10 ? `bis morgen früh etwa ${z}` : h <= 13 ? `bis morgen Mittag etwa ${z}` : h <= 17 ? `bis morgen Nachmittag etwa ${z}` : `bis morgen Abend etwa ${z}`;
+    if (tage === 1) return nachts(bis, jetzt) ? `in der Nacht bis etwa ${z}` : h <= 5 ? `bis morgen etwa ${z}` : h <= 10 ? `bis morgen früh etwa ${z}`
+      : h <= 13 ? `bis morgen Mittag etwa ${z}` : h <= 17 ? `bis morgen Nachmittag etwa ${z}` : `bis morgen Abend etwa ${z}`;
     return `bis übermorgen etwa ${z}`;
   }
-  function satz(jetzt, rest, fenster, tmax, boe, t24 = []) {
-    const teile = [], heute = tag(jetzt), stunde = d => `${d.getHours()} Uhr`;
-    const fh = fenster.filter(f => f.von.slice(0, 10) <= heute && new Date(f.bis) > jetzt);
-    if (fh.length) {
-      const f = fh[0], von = new Date(f.von), bis = new Date(f.bis), W = WORT[f.art] || WORT.regen;
+  // Beginn: "ab 18 Uhr", "ab Mitternacht", "in der Nacht ab 2 Uhr", "morgen ab 9 Uhr"
+  function abWann(von, jetzt) {
+    const h = von.getHours(), tage = tageVon(von, jetzt);
+    if (h === 0 && tage === 1) return "ab Mitternacht";
+    if (tage <= 0) return `ab ${h} Uhr`;
+    return nachts(von, jetzt) ? `in der Nacht ab ${h} Uhr` : `${tageWort(tage)}ab ${h} Uhr`;
+  }
+  // Zeitpunkt einer Spitze: "um 14 Uhr", "um Mitternacht", "in der Nacht um 3 Uhr", "morgen um 13 Uhr"
+  function umWann(t, jetzt) {
+    const h = t.getHours(), tage = tageVon(t, jetzt);
+    if (h === 0 && tage === 1) return "um Mitternacht";
+    if (tage <= 0) return `um ${h} Uhr`;
+    return nachts(t, jetzt) ? `in der Nacht um ${h} Uhr` : `${tageWort(tage)}um ${h} Uhr`;
+  }
+  // Zeitraum: "zwischen 13 und 16 Uhr", "zwischen 22 Uhr und Mitternacht", "zwischen Mitternacht und 3 Uhr", "in der Nacht zwischen 1 und 4 Uhr"
+  function zwischenWann(a, b, jetzt) {
+    const ha = a.getHours(), hb = b.getHours();
+    const kern = hb === 0 ? `zwischen ${ha} Uhr und Mitternacht` : ha === 0 ? `zwischen Mitternacht und ${hb} Uhr` : `zwischen ${ha} und ${hb} Uhr`;
+    return ha === 0 || tageVon(a, jetzt) <= 0 ? kern : nachts(a, jetzt) ? `in der Nacht ${kern}` : tageWort(tageVon(a, jetzt)) + kern;
+  }
+  // rest: die Stunden bis Mitternacht, spaet am Abend die naechsten 6 Stunden. nc: Nowcast (Radar) fuer die naechsten 3 Stunden
+  function satz(jetzt, rest, fenster, tmax, boe, t24 = [], nc = null) {
+    const teile = [], heute = tag(jetzt), mitternacht = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() + 1);
+    const restEnde = rest.length ? new Date(rest[rest.length - 1].zeit) : jetzt, ueberNacht = restEnde > mitternacht;
+    const blick = Math.max(restEnde, +jetzt + 6 * 36e5);              // Niederschlag mindestens 6 Stunden voraus, am Abend also auch die Nacht
+    const fh = fenster.filter(f => new Date(f.von) < blick && new Date(f.bis) > jetzt);
+    // Der Nowcast sieht den Niederschlag der naechsten 3 Stunden am Radar und geht vor
+    const f = fh[0], ncNass = !!(nc && nc.regnet), bald = f && new Date(f.von) - jetzt <= 3 * 36e5;
+    let laeuft = f && new Date(f.von) <= jetzt, abNc = null;
+    if (ncNass) {
+      if (!bald) teile.push(nc.text);                  // laut Modell in den naechsten 3 Stunden nichts
+      else if (nc.jetztNass) laeuft = true;
+      else if (nc.beginn) { laeuft = false; abNc = nc.beginn; }
+    }
+    if (f) {
+      const von = new Date(f.von), bis = new Date(f.bis), W = WORT[f.art] || WORT.regen;
       const art = f.max_pro_stunde >= (f.art === "regen" ? 4 : 2) ? W[2] : f.menge >= 1 ? W[1] : W[0];
-      if (von <= jetzt) { teile.push(`${art} ${bisWann(bis, jetzt, f.offen)}`); if (fh[1]) teile.push(`ab ${stunde(new Date(fh[1].von))} wieder ${NOMEN[fh[1].art] || "Regen"}`); }
-      else if (tag(bis) > heute || f.offen) teile.push(`${art} ab ${stunde(von)}, ${bisWann(bis, jetzt, f.offen)}`);
-      else teile.push(`${art} von ${von.getHours()} bis ${stunde(bis)}`);
-    } else {
+      const heuteZuEnde = !f.offen && tageVon(von, jetzt) <= 0 && (tag(bis) === heute || +bis === +mitternacht);
+      if (laeuft) { teile.push(`${art} ${bisWann(bis, jetzt, f.offen)}`); if (fh[1]) teile.push(`${abWann(new Date(fh[1].von), jetzt)} wieder ${NOMEN[fh[1].art] || "Regen"}`); }
+      else if (abNc) teile.push(`${art} ab etwa ${abNc}, ${bisWann(bis, jetzt, f.offen)}`);
+      else if (heuteZuEnde) teile.push(+bis === +mitternacht ? `${art} von ${von.getHours()} Uhr bis Mitternacht` : `${art} von ${von.getHours()} bis ${bis.getHours()} Uhr`);
+      else if (!f.offen && nachts(bis, jetzt) && +von === +mitternacht) teile.push(`${art} von Mitternacht bis ${bis.getHours()} Uhr`);
+      else if (!f.offen && nachts(bis, jetzt) && nachts(von, jetzt)) teile.push(`${art} in der Nacht von ${von.getHours()} bis ${bis.getHours()} Uhr`);
+      else teile.push(`${art} ${abWann(von, jetzt)}, ${bisWann(bis, jetzt, f.offen)}`);
+    } else if (!ncNass) {
       const w = rest.reduce((a, s) => a + s.wolken, 0) / Math.max(rest.length, 1);
       teile.push(rest.some(s => s.symbol === "nebel") ? "Trocken, zeitweise Nebel" : w >= 85 ? "Trocken und durchgehend bedeckt"
         : w >= 50 ? "Trocken bei vielen Wolken" : w >= 20 ? "Trocken und zeitweise sonnig" : "Trocken und klar");
     }
     if (boe >= 40) {                                   // wann und wie stark: Zeitfenster rund um die Spitze
-      const grenze = Math.max(40, boe * .8), stark = rest.filter(x => x.boe >= grenze);
-      const h0 = +stark[0].zeit.slice(11, 13), h1 = +stark[stark.length - 1].zeit.slice(11, 13);
-      teile.push(stark.length >= rest.length - 1 ? `Böen bis ${boe} km/h` : h0 === h1 ? `Böen bis ${boe} km/h um ${h0} Uhr` : `Böen bis ${boe} km/h zwischen ${h0} und ${h1} Uhr`);
+      const grenze = Math.max(40, boe * .8), stark = rest.filter(x => x.boe >= grenze), a = new Date(stark[0].zeit), b = new Date(stark[stark.length - 1].zeit);
+      teile.push(stark.length >= rest.length - 1 ? `Böen bis ${boe} km/h`
+        : stark[0] === rest[0] ? `Böen bis ${boe} km/h, noch bis etwa ${b.getHours() === 0 ? "Mitternacht" : b.getHours() + " Uhr"}`
+        : stark.length === 1 ? `Böen bis ${boe} km/h ${umWann(a, jetzt)}` : `Böen bis ${boe} km/h ${zwischenWann(a, b, jetzt)}`);
     }
-    // Sturmboeen nach Mitternacht, aber innerhalb der naechsten 24 Stunden, auch erwaehnen
-    const spaeter = t24.filter(x => tag(new Date(x.zeit)) !== tag(jetzt)), sp = spaeter.reduce((a, x) => x.boe > (a ? a.boe : -1) ? x : a, null);
+    // Sturmboeen danach, aber innerhalb der naechsten 24 Stunden, auch erwaehnen
+    const spaeter = t24.filter(x => new Date(x.zeit) > restEnde), sp = spaeter.reduce((a, x) => x.boe > (a ? a.boe : -1) ? x : a, null);
     if (sp && sp.boe >= 60 && sp.boe > boe) {
-      const h = +sp.zeit.slice(11, 13), wann = h < 5 ? "In der Nacht" : h < 11 ? "Morgen früh" : h < 14 ? "Morgen Mittag" : h < 18 ? "Morgen Nachmittag" : "Morgen Abend";
-      teile.push(`${wann} um ${h} Uhr ${sp.boe >= 75 ? "Sturmböen" : "kräftige Böen"} bis ${sp.boe} km/h`);
+      const t = new Date(sp.zeit), h = t.getHours(), wann = h === 0 ? "Um Mitternacht" : h < 5 ? `In der Nacht um ${h} Uhr` : h < 11 ? `Morgen früh um ${h} Uhr`
+        : h < 14 ? `Morgen Mittag um ${h} Uhr` : h < 18 ? `Morgen Nachmittag um ${h} Uhr` : `Morgen Abend um ${h} Uhr`;
+      teile.push(`${wann} ${sp.boe >= 75 ? "Sturmböen" : "kräftige Böen"} bis ${sp.boe} km/h`);
     }
     if (rest.length) {
       const tief = Math.min(...rest.map(s => s.temp));
       if (jetzt.getHours() < 14) teile.push(`Höchstwert ${Math.round(tmax)} Grad`);
-      else if (tief <= rest[0].temp - 1.5) teile.push(`bis Mitternacht kühlt es auf ${Math.round(tief)} Grad ab`);
+      else if (tief <= rest[0].temp - 1.5) teile.push(`${ueberNacht ? "in der Nacht" : "bis Mitternacht"} kühlt es auf ${Math.round(tief)} Grad ab`);
       else teile.push(`die Temperatur bleibt bei rund ${Math.round(tief)} Grad`);
     }
     return teile.map(t => t[0].toUpperCase() + t.slice(1)).join(". ") + ".";
@@ -361,7 +404,7 @@ const Wetter = (() => {
   }
 
   /* ---------- Zusammenbauen ---------- */
-  function baue(stunden, omDaily, jetzt, ort, lat, lon, quellen, lauf, ncRoh) {
+  function baue(stunden, omDaily, jetzt, ort, lat, lon, quellen, lauf, ncRoh, mess) {
     const heute = tag(jetzt);
     // vergangene Stunden von heute merken, damit Minimum und Maximum fuer den ganzen Tag stimmen
     let verlauf = {};
@@ -372,7 +415,9 @@ const Wetter = (() => {
 
     const kommend = stunden.filter(s => new Date(s.zeit) > new Date(jetzt - 18e5));
     const aktuell = kommend[0] || stunden[stunden.length - 1];
-    let rest = kommend.filter(s => s.zeit.slice(0, 10) === heute); if (rest.length < 3) rest = kommend.slice(0, 6);
+    // bis Mitternacht: die Stunde bis 0 Uhr gehoert noch zu heute; spaet am Abend die naechsten 6 Stunden
+    const mitternacht = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() + 1);
+    let rest = kommend.filter(s => new Date(s.zeit) <= mitternacht); if (rest.length < 3) rest = kommend.slice(0, 6);
 
     const om = {}; if (omDaily) omDaily.time.forEach((t, i) => om[t] = Object.fromEntries(Object.keys(omDaily).filter(k => k !== "time").map(k => [k, omDaily[k][i]])));
     const woche = [];
@@ -398,7 +443,13 @@ const Wetter = (() => {
       } else continue;
       woche.push(e);
     }
-    const fenster = regenfenster(kommend.slice(0, 48)), t0 = woche[0], boeRest = Math.max(0, ...rest.map(s => s.boe));
+    const fenster = regenfenster(kommend.slice(0, 48)), t0 = woche[0];
+    // Messwert der naechsten Station: die App zeigt ihn als aktuelle Temperatur, also passen Jetzt-Spalte, gefuehlt, Hoechst- und Tiefstwert dazu
+    if (mess && mess.temp != null && kommend.length && jetzt - new Date(mess.zeit) < 60 * 60000) {
+      const dt = mess.temp - aktuell.temp; aktuell.temp = mess.temp; if (aktuell.gefuehlt != null) aktuell.gefuehlt = r1(aktuell.gefuehlt + dt);
+      t0.max = r1(Math.max(t0.max, mess.temp)); t0.min = r1(Math.min(t0.min, mess.temp));
+    }
+    const boeRest = Math.max(0, ...rest.map(s => s.boe));
     const ord = ["trocken", "möglich", "wahrscheinlich", "sicher"], stufen = rest.map(s => s.risiko).filter(Boolean);
     const [auf, unter] = sonne(jetzt, lat, lon);
     const d0 = aktuell.druck, d3 = kommend[3]?.druck;
@@ -411,13 +462,14 @@ const Wetter = (() => {
       const [sym, txt] = a === "schnee" ? ["schnee", m >= .5 ? "Schneefall" : "Leichter Schneefall"] : a === "schneeregen" ? ["schneeregen", "Schneeregen"]
         : [m >= .5 ? "regen" : "regen_leicht", m >= .5 ? "Regen" : "Leichter Regen"];
       if (!NASS.has(aktuell.symbol) || a !== "regen") Object.assign(aktuell, { symbol: sym, text: txt });
-      aktuell.regen = Math.max(aktuell.regen || 0, m);
+      aktuell.regen = Math.max(aktuell.regen || 0, m); aktuell.risiko = "sicher"; aktuell.risiko_prozent = 100;   // es faellt ja schon etwas
       if (ch !== "gewitter" && ch !== "sturm") ch = a === "regen" ? (ch === "schnee" ? ch : "regen") : "schnee";
     }
     return {
-      ort, koordinaten: [lat, lon], stand: iso(jetzt), modelllauf: lauf, charakter: ch, nacht: !(auf <= jetzt && jetzt <= unter), jetzt: aktuell,
+      ort, koordinaten: [lat, lon], stand: iso(jetzt), erstellt: iso(jetzt), modelllauf: lauf, charakter: ch, nacht: !(auf <= jetzt && jetzt <= unter), jetzt: aktuell,
       heute: { min: t0.min, max: t0.max, regen_rest: r1(rest.reduce((a, s) => a + s.regen, 0)), regenrisiko: stufen.length ? stufen.reduce((a, c) => ord.indexOf(c) > ord.indexOf(a) ? c : a) : null,
-               regenfenster: fenster, boe_max: boeRest, sonne_h: t0.sonne_h, sonnenaufgang: uhr(auf), sonnenuntergang: uhr(unter), satz: satz(jetzt, rest, fenster, t0.max, boeRest, kommend.slice(0, 24)),
+               rest_bis: (h => h === 0 ? "Mitternacht" : h + " Uhr")(rest.length ? new Date(rest[rest.length - 1].zeit).getHours() : 0),   // spaet am Abend z. B. "4 Uhr"
+               regenfenster: fenster, boe_max: boeRest, sonne_h: t0.sonne_h, sonnenaufgang: uhr(auf), sonnenuntergang: uhr(unter), satz: satz(jetzt, rest, fenster, t0.max, boeRest, kommend.slice(0, 24), nc),
                drucktrend: trend, arten_24h: arten(t24), schneefallgrenze_24h: gr.length ? [Math.min(...gr), Math.max(...gr)] : null },
       nowcast: nc, stunden: kommend, woche, quellen: [...new Set([...quellen, ...(omDaily ? ["Open-Meteo (CC BY 4.0)"] : [])])],
     };
@@ -490,7 +542,7 @@ const Wetter = (() => {
     const ort = await ortP;
     const jetzt = new Date();
 
-    function bauen(ensX, ncX) {
+    function bauen(ensX, ncX, messX = null) {
       let stunden = nwp ? stundenGeo(nwp, ensX, lat, lon) : [], quellen = ["GeoSphere Austria (CC BY 4.0)"], lauf = nwp?.reference_time || null;
       if (!stunden.length) {     // ausserhalb Oesterreichs oder GeoSphere nicht erreichbar
         stunden = omH ? stundenOM(omH, lat, lon).filter(s => new Date(s.zeit) > Date.now() - 36e5).slice(0, 60) : []; quellen = ["Open-Meteo (CC BY 4.0)"]; lauf = null;
@@ -502,7 +554,7 @@ const Wetter = (() => {
         const rest = stundenOM(om, lat, lon).filter(s => s.zeit > ende && s.zeit.slice(0, 10) === tagEnde).map(s => ({ ...s, quelle: "Open-Meteo" }));
         if (rest.length) { stunden = stunden.concat(rest); quellen = [...quellen, "Open-Meteo (CC BY 4.0)"]; }
       }
-      const d = baue(stunden, om?.daily || null, jetzt, ort, lat, lon, quellen, lauf, ncX);
+      const d = baue(stunden, om?.daily || null, jetzt, ort, lat, lon, quellen, lauf, ncX, messX);
       // Stundenwerte fuer die spaeteren Tage, nur fuer die Tagesdetails (die Tageszeilen kommen weiter aus den Tageswerten)
       const omQ = om?.hourly ? om : omH, letzterTag = stunden[stunden.length - 1].zeit.slice(0, 10);
       d.weitere = omQ ? stundenOM(omQ, lat, lon).filter(s => s.zeit.slice(0, 10) > letzterTag).map(s => ({ ...s, quelle: "Open-Meteo" })) : [];
@@ -520,7 +572,7 @@ const Wetter = (() => {
     d.vollstaendig = ensDa && ncDa;
     // Nachreichen: Regenwahrscheinlichkeit, Nowcast, Messwerte, Luftqualitaet
     const extras = Promise.all([messP, luftP, ensP2, ncP]).then(([m, lu, e, n]) => {
-      if (!d.vollstaendig) { try { Object.assign(d, bauen(e, n)); } catch (x) {} d.vollstaendig = true; }
+      if (!d.vollstaendig || m) { try { Object.assign(d, bauen(e, n, m)); } catch (x) {} d.vollstaendig = true; }   // mit Messwert neu, damit alle Werte zur gezeigten Temperatur passen
       d.messung = m; d.pollen = lu ? lu.pollen : null;
       d.woche.forEach(w => { const a = lu?.tage?.[w.datum]; w.luft = a != null ? Math.round(a) : null; w.luft_text = luftText(a); });
       d.luft = lu && (lu.jetzt != null || d.woche[0]?.luft != null) ? { jetzt: lu.jetzt, max: d.woche[0]?.luft ?? null, text: luftText(lu.jetzt ?? d.woche[0]?.luft) } : null;
@@ -532,5 +584,5 @@ const Wetter = (() => {
     if (standortNeu) Object.defineProperty(d, "standortNeu", { value: standortNeu, enumerable: false });
     return d;
   }
-  return { laden, suche, _test: { baue, stundenGeo, nowcast } };
+  return { laden, suche, umWann, _test: { baue, stundenGeo, nowcast } };
 })();

@@ -380,25 +380,26 @@ function gross() {
   standZeile(rechts);
 
   w.addSpacer(3);
-  // Zusammenfassung ohne den Satz zur Temperatur (steht in den Kaestchen); kommt bald Niederschlag, minutengenau aus dem Nowcast
+  // Zusammenfassung wie in der App (der Nowcast steckt schon drin), ohne den Satz zur Temperatur (steht in den Kaestchen)
   const teile = (h.satz || "").split(/(?<=\.)\s+/);
-  if (d.nowcast && d.nowcast.regnet && d.nowcast.text) teile[0] = d.nowcast.text + ".";
-  const satz = teile.filter(x => !/^(Höchstwert|Die Temperatur|Bis Mitternacht)/i.test(x)).join(" ");
+  const satz = teile.filter(x => !/^(Höchstwert|Die Temperatur|Bis Mitternacht kühlt|In der Nacht kühlt)/i.test(x)).join(" ");
   const satzS = w.addStack(); satzS.size = new Size(0, 34); satzS.layoutVertically();      // feste Hoehe: zwei Zeilen sind immer sicher
   text(satzS, satz, Font.systemFont(13.5), SOFT, { zeilen: 2, skala: .8 });
   w.addSpacer(5);
 
   if (grafik(w)) w.addSpacer(5);
 
-  // Heute, Morgen, Uebermorgen als eigene Kapseln, getoent wie die Tage in der App
-  const TAGNAME = ["Heute", "Morgen"];
+  // Heute, Morgen, Uebermorgen als eigene Kapseln, getoent wie die Tage in der App; der Name kommt aus dem Datum, falls die Daten von gestern sind
+  const ds = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`, jt = new Date();
+  const TAGNAME = { [ds(jt)]: "Heute", [ds(new Date(jt.getFullYear(), jt.getMonth(), jt.getDate() + 1))]: "Morgen" };
+  const WTAG = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
   d.woche.slice(0, 3).forEach((t, i) => {
     if (i) w.addSpacer(4);
     const [ton, ta] = tagesTon(t), g = new LinearGradient();
     g.colors = [farbe(ton, Math.min(.6, ta * .95)), farbe(ton, .06)]; g.locations = [0, 1]; g.startPoint = new Point(0, .5); g.endPoint = new Point(1, .5);
     const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 47); z.cornerRadius = 14; z.backgroundGradient = g; z.setPadding(0, 10, 0, 8);
     const a = z.addStack(); a.layoutVertically(); a.size = new Size(78, 0);
-    text(a, TAGNAME[i] || t.tag, Font.boldRoundedSystemFont(18), WEISS, { zeilen: 1, skala: .7 });
+    text(a, TAGNAME[t.datum] || WTAG[new Date(t.datum + "T12:00").getDay()], Font.boldRoundedSystemFont(18), WEISS, { zeilen: 1, skala: .7 });
     text(a, `${t.datum.slice(8, 10)}.${t.datum.slice(5, 7)}.`, Font.mediumSystemFont(13), SOFT);
     const b = z.addStack(); b.layoutVertically(); b.size = new Size(58, 0); b.centerAlignContent();
     const bs = b.addStack(); bs.addSpacer(); symbol(bs, t.symbol, false, 27); bs.addSpacer();
