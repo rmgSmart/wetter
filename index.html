@@ -374,7 +374,7 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
 /* Glas mit Lichtkante: oben links hell, unten rechts ein Hauch, dazwischen fast unsichtbar */
 .card { position: relative; border-radius: 30px; background: var(--panel);
   box-shadow: inset 0 1px 1px rgba(255,255,255,.1), 0 18px 44px rgba(0,0,0,.28); }
-.card::before, .dayrow.open::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+.card::before, .dayrow::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
   background: linear-gradient(150deg, rgba(255,255,255,.55), rgba(255,255,255,.1) 30%, rgba(255,255,255,.03) 62%, rgba(255,255,255,.22));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
 .card h2, .card h3 { font-family: var(--body); font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); }
@@ -404,6 +404,14 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   background: linear-gradient(90deg, rgba(var(--tint), calc(var(--ta) * .85)), rgba(var(--tint), calc(var(--ta) * .25)) 72%, rgba(var(--tint), .04)), rgba(255,255,255,.05); }
 .dayrow.open { margin: 4px 0; border: 0; border-radius: 22px; padding: 2px 12px 12px; box-shadow: 0 10px 28px rgba(0,0,0,.3);
   background: linear-gradient(90deg, rgba(var(--tint), calc(var(--ta) * .85)), rgba(var(--tint), calc(var(--ta) * .25)) 72%, rgba(var(--tint), .04)), rgba(255,255,255,.12); }
+/* Auf- und Zuklappen: Abstand, Rundung, Schatten, Flaeche und Lichtkante wechseln in 0,2 s */
+.dayrow { transition: margin .2s, padding .2s, border-radius .2s, box-shadow .2s, background-color .2s; }
+.dayrow::before { opacity: 0; transition: opacity .2s; }
+.dayrow.open::before { opacity: 1; }
+.day .n { transition: color .2s; }
+.seg button { transition: background-color .15s, color .15s, box-shadow .15s; }
+@media (prefers-reduced-motion: reduce) { .dayrow, .dayrow::before, .day .n, .day svg.chev, .seg button { transition: none; } }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .25s; }
 .day .bar { height: 7px; border-radius: 4px; background: rgba(255,255,255,.12); }
 .day .bar b { border-radius: 4px; box-shadow: 0 0 10px rgba(255,255,255,.18); }
 .day .bar .jetzt { display: block; position: absolute; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(10,16,36,.55), 0 0 8px rgba(255,255,255,.7); }
@@ -464,17 +472,20 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611251708"></script>
-<script src="gigio.js?v=202611251708"></script>
+<script src="daten.js?v=202611251750"></script>
+<script src="gigio.js?v=202611251750"></script>
 <script>
-const VERSION = "202611251708";                        // ganz oben, weil render() sie schon beim Start braucht
-const NUMMER = "1.79";                                  // wird von bump.sh hochgezaehlt
+const VERSION = "202611251750";                        // ganz oben, weil render() sie schon beim Start braucht
+const NUMMER = "1.80";                                  // wird von bump.sh hochgezaehlt
 "use strict";
 const $ = id => document.getElementById(id);
 const de = n => String(n).replace(".", ",");
 const grad = n => Math.round(n) + "°";
 const hh = iso => +iso.slice(11, 13);
 const TAG_KURZ = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+// Kurze Uebergaenge, rund 0,2 Sekunden; bei "Bewegung reduzieren" (iOS) keine
+const RUHIG = matchMedia("(prefers-reduced-motion: reduce)"), SANFT = "cubic-bezier(.2,.8,.2,1)";
+const bewegt = el => !RUHIG.matches && !!el && typeof el.animate === "function";
 const wtag = iso => TAG_KURZ[new Date(iso.slice(0, 10) + "T12:00:00Z").getUTCDay()];
 
 /* ---------- Symbole ---------- */
@@ -718,25 +729,26 @@ function tagesfarbe(w) {
   if (anteil >= .25) return ["255,196,60", +(.12 + .36 * anteil).toFixed(2)];
   return w.symbol === "nebel" ? TINT.nebel : ["120,132,146", +(.3 - .2 * anteil / .25).toFixed(2)];
 }
+// Details eines Tages (aufgeklappt): Kacheln, Stundenstreifen, Text
+function tagDetail(d, w) {
+  const tile = (k, v, e = "") => `<div class="tile"><div class="k">${k}</div><div class="v">${v} <small>${e}</small></div></div>`;
+  let st = d.stunden.filter(s => s.zeit.slice(0, 10) === w.datum);
+  if (!st.length) st = (d.weitere || []).filter(s => s.zeit.slice(0, 10) === w.datum);     // spaetere Tage: Stunden von Open-Meteo
+  const strip = leiste(st, s => hh(s.zeit) + " Uhr");
+  return `<div class="detail"><div class="tiles">
+    ${tile("Aufgang", w.sonnenaufgang)}${tile("Untergang", w.sonnenuntergang)}
+    ${tile("Sonne", de(w.sonne_h), "h")}${tile("Böen bis", w.boe, "km/h")}
+    ${tile("Niederschlag", de(w.regen), "mm")}<div class="tile"><div class="k">Risiko</div><div class="v klein">${risikoWort(w.regen_prozent)}</div></div>
+    ${w.uv != null ? tile("UV-Index", w.uv, w.uv_text) : ""}${w.luft != null ? `<div class="tile"><div class="k">Luftqualität</div><div class="v klein">${w.luft_text} <small>schlechtester Wert</small></div></div>` : ""}
+    ${w.wolken != null ? tile("Bewölkung", w.wolken, "%") + tile("Schnee&shy;fall&shy;grenze", w.schneefallgrenze_min != null ? schneeGrenze(w.schneefallgrenze_min) : "?", w.schneefallgrenze_min != null && w.schneefallgrenze_min < 200 ? "" : "m") + `<div class="tile breit"><div class="k">Art</div><div class="v klein">${w.arten && w.arten.length ? w.arten.join(", ") : w.regen >= .1 ? "Niederschlag" : "trocken"}</div></div>` : ""}
+    </div>${strip}<p class="note">${w.text}</p></div>`;
+}
 function cardWoche(d) {
   const lo = Math.min(...d.woche.map(w => w.min)), hi = Math.max(...d.woche.map(w => w.max)), sp = Math.max(hi - lo, 1);
-  const tile = (k, v, e = "") => `<div class="tile"><div class="k">${k}</div><div class="v">${v} <small>${e}</small></div></div>`;
   const rows = d.woche.map(w => {
     const l = (w.min - lo) / sp * 100, r = (hi - w.max) / sp * 100, offen = openDay === w.datum;
     const p = w.regen >= 0.1 ? `${de(w.regen)} mm${w.regen_prozent != null ? "<br>" + risikoWort(w.regen_prozent) : ""}` : "";
-    let detail = "";
-    if (offen) {
-      let st = d.stunden.filter(s => s.zeit.slice(0, 10) === w.datum);
-      if (!st.length) st = (d.weitere || []).filter(s => s.zeit.slice(0, 10) === w.datum);     // spaetere Tage: Stunden von Open-Meteo
-      const strip = leiste(st, s => hh(s.zeit) + " Uhr");
-      detail = `<div class="detail"><div class="tiles">
-        ${tile("Aufgang", w.sonnenaufgang)}${tile("Untergang", w.sonnenuntergang)}
-        ${tile("Sonne", de(w.sonne_h), "h")}${tile("Böen bis", w.boe, "km/h")}
-        ${tile("Niederschlag", de(w.regen), "mm")}<div class="tile"><div class="k">Risiko</div><div class="v klein">${risikoWort(w.regen_prozent)}</div></div>
-        ${w.uv != null ? tile("UV-Index", w.uv, w.uv_text) : ""}${w.luft != null ? `<div class="tile"><div class="k">Luftqualität</div><div class="v klein">${w.luft_text} <small>schlechtester Wert</small></div></div>` : ""}
-        ${w.wolken != null ? tile("Bewölkung", w.wolken, "%") + tile("Schnee&shy;fall&shy;grenze", w.schneefallgrenze_min != null ? schneeGrenze(w.schneefallgrenze_min) : "?", w.schneefallgrenze_min != null && w.schneefallgrenze_min < 200 ? "" : "m") + `<div class="tile breit"><div class="k">Art</div><div class="v klein">${w.arten && w.arten.length ? w.arten.join(", ") : w.regen >= .1 ? "Niederschlag" : "trocken"}</div></div>` : ""}
-        </div>${strip}<p class="note">${w.text}</p></div>`;
-    }
+    const detail = offen ? tagDetail(d, w) : "";
     const [tint, ta] = tagesfarbe(w);
     return `<div class="dayrow${offen ? " open" : ""}" style="--tint:${tint};--ta:${ta}"><button type="button" class="day" data-day="${w.datum}" aria-expanded="${offen}">
       <span class="n">${w.tag}<small>${de(w.sonne_h)} h Sonne</small></span>${icon(w.symbol, false)}<span class="p">${p}</span><span class="lo">${grad(w.min)}</span><span class="bar"><b style="left:${l}%;right:${r}%;background:linear-gradient(90deg,${tempFarbe(w.min)},${tempFarbe(w.max)})"></b>${w.tag === "Heute" ? `<i class="jetzt" style="left:${Math.min(100, Math.max(0, (d.jetzt.temp - lo) / sp * 100)).toFixed(1)}%"></i>` : ""}</span><span class="hi">${grad(w.max)}</span>
@@ -875,7 +887,7 @@ function orteZeichnen() {
   $("orteListe").innerHTML = `<div class="zeile"><button type="button" class="w${ORTWAHL ? "" : " aktiv"}" data-i="gps">Aktueller Standort<small>folgt dem iPhone</small></button></div>` + ORTE.map(z).join("");
 }
 function waehle(o) {
-  ORTWAHL = o; schreibe("ortwahl", o); $("orte").hidden = true; document.body.style.overflow = "";
+  ORTWAHL = o; schreibe("ortwahl", o); blattZu();
   WECHSEL = o ? o.name : "Aktueller Standort"; zuletzt = 0; scrollTo(0, 0);
   const alt = lese(ortKey(o), null);                    // letzter bekannter Stand dieses Orts, sofort zeigen
   wechselAlt = !!(alt && Date.now() - new Date(alt.stand).getTime() < 6 * 36e5);
@@ -892,8 +904,25 @@ async function sucheOrt() {
   if (nr !== suchNr) return; TREFFER = r;
   $("ortTreffer").innerHTML = r.length ? r.map((o, i) => `<div class="zeile"><button type="button" class="w" data-t="${i}">${o.name}${o.zusatz ? `<small>${o.zusatz}</small>` : ""}</button><button type="button" class="merk" data-m="${i}">Merken</button></div>`).join("") : `<div class="info">Nichts gefunden.</div>`;
 }
-$("loc").onclick = () => { orteZeichnen(); $("ortSuche").value = ""; $("ortTreffer").innerHTML = ""; $("orte").hidden = false; document.body.style.overflow = "hidden"; };
-$("orteZu").onclick = () => { $("orte").hidden = true; document.body.style.overflow = ""; };
+// Ortsblatt: faehrt von unten herein, der abgedunkelte Hintergrund blendet ein; beim Schliessen umgekehrt
+let blattNr = 0;
+function blattAuf() {
+  const o = $("orte"), b = o.querySelector(".blatt"); blattNr++; o.hidden = false; document.body.style.overflow = "hidden";
+  if (!bewegt(o)) return;
+  [...o.getAnimations(), ...b.getAnimations()].forEach(a => a.cancel());
+  o.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: "ease-out" });
+  b.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 260, easing: SANFT });
+}
+function blattZu() {
+  const o = $("orte"), nr = ++blattNr; document.body.style.overflow = "";
+  if (o.hidden) return;
+  if (!bewegt(o)) { o.hidden = true; return; }
+  const b = o.querySelector(".blatt").animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 190, easing: "cubic-bezier(.4,0,1,1)", fill: "forwards" });
+  const a = o.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 190, easing: "ease-in", fill: "forwards" });
+  a.onfinish = () => { if (nr === blattNr) o.hidden = true; a.cancel(); b.cancel(); };
+}
+$("loc").onclick = () => { orteZeichnen(); $("ortSuche").value = ""; $("ortTreffer").innerHTML = ""; blattAuf(); };
+$("orteZu").onclick = () => blattZu();
 $("orte").onclick = e => {
   if (e.target === $("orte")) return $("orteZu").onclick();
   const b = e.target.closest("button"); if (!b) return;
@@ -996,12 +1025,46 @@ function ersetze(k, f) {
   const alt = document.querySelector(`[data-karte="${k}"]`), html = alt && DATA ? f(DATA) : "";
   if (!html) return render();
   alt.outerHTML = html; Gigio.neu();
+  return document.querySelector(`[data-karte="${k}"]`);
+}
+// Auf- oder zuklappen: Hoehe, Abstand oben und Deckkraft zwischen 0 und dem echten Wert
+function klappe(el, auf, fertig) {
+  if (!bewegt(el)) return fertig && fertig();
+  const cs = getComputedStyle(el), voll = { height: el.offsetHeight + "px", paddingTop: cs.paddingTop, marginTop: cs.marginTop, opacity: 1 },
+        zu = { height: "0px", paddingTop: "0px", marginTop: "0px", opacity: 0 };
+  el.style.overflow = "hidden";
+  const a = el.animate(auf ? [zu, voll] : [voll, zu], { duration: auf ? 220 : 170, easing: SANFT, fill: auf ? "none" : "forwards" });
+  a.onfinish = () => { el.style.overflow = ""; fertig && fertig(); };
+}
+// Tag auf- und zuklappen, ohne die Wochenkarte neu zu bauen: so koennen Rahmen, Schatten und Pfeil weich wechseln
+function tagUmschalten(knopf) {
+  const datum = knopf.dataset.day, reihe = knopf.closest(".dayrow"), w = DATA && DATA.woche.find(x => x.datum === datum);
+  if (!reihe || !w) { openDay = openDay === datum ? null : datum; return ersetze("woche", cardWoche); }
+  reihe.parentElement.querySelectorAll(".dayrow.open").forEach(r => {
+    r.classList.remove("open"); r.querySelector(".day").setAttribute("aria-expanded", "false");
+    r.querySelectorAll(".detail").forEach(det => klappe(det, false, () => { det.remove(); Gigio.neu(); }));
+  });
+  if (openDay === datum) { openDay = null; return; }
+  openDay = datum;
+  reihe.querySelectorAll(".detail").forEach(x => x.remove());             // vom Zuklappen eben noch da
+  reihe.classList.add("open"); knopf.setAttribute("aria-expanded", "true");
+  reihe.insertAdjacentHTML("beforeend", tagDetail(DATA, w));
+  klappe(reihe.lastElementChild, true, () => Gigio.neu());
+}
+// Niederschlag 3 Std und 24 Std: Karte wechselt die Hoehe weich, der Inhalt blendet kurz ein
+function regenUmschalten(v) {
+  const alt = document.querySelector('[data-karte="regen"]'), h0 = alt ? alt.offsetHeight : 0;
+  regenView = v; const neu = ersetze("regen", cardRegen);
+  if (!bewegt(neu)) return;
+  const h1 = neu.offsetHeight;
+  if (h0 && Math.abs(h1 - h0) > 1) { neu.style.overflow = "hidden"; neu.animate([{ height: h0 + "px" }, { height: h1 + "px" }], { duration: 200, easing: SANFT }).onfinish = () => { neu.style.overflow = ""; Gigio.neu(); }; }
+  neu.querySelectorAll(".lead, .regenart, .chart, .note, .legend").forEach(x => x.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: "ease-out" }));
 }
 $("cards").addEventListener("click", e => {
   const tag = e.target.closest(".day[data-day]");
-  if (tag) { openDay = openDay === tag.dataset.day ? null : tag.dataset.day; return ersetze("woche", cardWoche); }
+  if (tag) return tagUmschalten(tag);
   const rv = e.target.closest("[data-rv]");
-  if (rv) { regenView = rv.dataset.rv; ersetze("regen", cardRegen); }
+  if (rv && rv.getAttribute("aria-pressed") !== "true") regenUmschalten(rv.dataset.rv);
 });
 load();
 // Automatisch neu laden, sobald die Daten aelter als 15 Minuten sind. iOS haelt Zeitgeber im Hintergrund an,
@@ -1083,7 +1146,11 @@ function setzeThema(t) {
   document.querySelectorAll("#thema button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.thema === t)));
   const cs = getComputedStyle(document.documentElement); $("themecolor").content = cs.getPropertyValue("--sky-a").trim(); fxHell = cs.colorScheme === "light";
 }
-$("thema").onclick = e => { const b = e.target.closest("button"); if (b) setzeThema(b.dataset.thema); };
+// Wechsel des Aussehens kurz ueberblenden, wo der Browser das kann (Safari ab iOS 18), sonst sofort
+$("thema").onclick = e => {
+  const b = e.target.closest("button"); if (!b || b.getAttribute("aria-pressed") === "true") return;
+  if (document.startViewTransition && !RUHIG.matches) document.startViewTransition(() => setzeThema(b.dataset.thema)); else setzeThema(b.dataset.thema);
+};
 setzeThema((() => { try { const t = localStorage.getItem("thema"); return ["wetter", "gigio", "modern"].includes(t) ? t : "modern"; } catch (e) { return "modern"; } })());   // frueheres "Kraeftig" (bunt) wird zu Modern
 
 /* ---------- Gigio Mode ---------- */
