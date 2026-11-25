@@ -168,6 +168,9 @@ function mond(dc, x, y, r) {
   p.addCurve(new Point(x + .2 * r, y - r), new Point(x - .45 * r, y + .7 * r), new Point(x - .45 * r, y - .7 * r));
   dc.addPath(p); dc.setFillColor(farbe("#ffe38a")); dc.fillPath();
 }
+function flocke(dc, x, y, r) {                // Schneeflocke mit sechs Armen
+  [90, 30, 150].forEach(g => { const a = g * Math.PI / 180, dx = Math.cos(a) * r, dy = Math.sin(a) * r; linie(dc, x - dx, y - dy, x + dx, y + dy, WEISS, 1.3); });
+}
 // Symbol einmal in eigenes Bild zeichnen, dann beliebig gross einsetzen
 const SYMBILD = {};
 function symbolBild(sym, nacht) {
@@ -188,9 +191,9 @@ function zeichneSymbol(dc, sym, nacht, x, y) {      // Symbol etwa 26 Punkte bre
   if (sym.startsWith("regen") || sym === "schneeregen") {
     const n = sym === "regen_leicht" ? 1 : sym === "regen_stark" ? 3 : 2, xs = [[0], [-3, 3], [-5, 0, 5]][n - 1];
     xs.forEach(o => linie(dc, x + o + 1, y + 6.5, x + o - .5, y + 10.5, farbe("#49b6ff"), 1.8));
-    if (sym === "schneeregen") kreis(dc, x + 5, y + 9, 1.3, WEISS);
+    if (sym === "schneeregen") flocke(dc, x + 5, y + 9.5, 2.6);
   }
-  if (sym === "schnee") [-4, 0, 4].forEach((o, k) => kreis(dc, x + o, y + (k % 2 ? 10 : 8), 1.4, WEISS));
+  if (sym === "schnee") { flocke(dc, x - 4, y + 9.5, 2.8); flocke(dc, x + 4, y + 9.5, 2.8); }
   if (sym === "nebel") { linie(dc, x - 7, y + 8, x + 7, y + 8, W2, 1.6); linie(dc, x - 5, y + 11, x + 5, y + 11, W2, 1.6); }
   if (sym === "gewitter") {
     const p = new Path(); [[1, 5], [-2.5, 9.5], [0, 9.5], [-1.5, 13.5], [3.5, 8], [1, 8], [2.5, 5]].forEach(([a, b], k) => k ? p.addLine(new Point(x + a, y + b)) : p.move(new Point(x + a, y + b)));
