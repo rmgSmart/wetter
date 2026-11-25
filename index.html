@@ -164,7 +164,9 @@ svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
 .detail .tile { min-width: 0; }
 .detail .tile .k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .detail .tile .v { font-size: 19px; }
-.detail .tile .v.klein { font-size: 14px; overflow-wrap: anywhere; }
+.detail .tile .v.klein { font-size: 14px; overflow-wrap: break-word; }
+.detail .tiles { grid-auto-flow: row dense; }
+.detail .tile.breit { grid-column: span 2; }
 .detail .hours { margin: 12px 0 0; padding: 0; max-width: 100%; }
 .detail .note { margin-top: 4px; }
 
@@ -321,45 +323,82 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
 .thema { flex-direction: column; align-items: stretch; gap: 10px; }
 .thema .seg { display: flex; }
 .thema .seg button { flex: 1; padding: 8px 6px; }
-/* Aussehen "Kraeftig": satte, mehrfarbige Verlaeufe je Wetter und Tageszeit */
-:root[data-theme="bunt"] { --panel: rgba(8,24,48,.2); --glass-edge: rgba(255,255,255,.4); --line: rgba(255,255,255,.22); }
-:root[data-theme="bunt"] .sky::before, :root[data-theme="bunt"] .sky::after { content: ""; position: absolute; inset: 0; pointer-events: none; transition: opacity .8s; }
-:root[data-theme="bunt"][data-sky="sonnig"]   { --sky-a:#0a66f0; --sky-b:#58aef6; --accent:#ffd84a; }
-:root[data-theme="bunt"][data-sky="sonnig"] .sky   { background: radial-gradient(120% 60% at 85% 0%, rgba(255,214,110,.6), transparent 60%), linear-gradient(180deg,#0a66f0 0%,#2f93fb 48%,#58aef6 100%); }
-:root[data-theme="bunt"][data-sky="heiter"]   { --sky-a:#1a74e0; --sky-b:#7bb9ec; --accent:#ffd866; }
-:root[data-theme="bunt"][data-sky="heiter"] .sky   { background: radial-gradient(110% 55% at 80% 0%, rgba(255,224,150,.45), transparent 62%), linear-gradient(180deg,#1a74e0 0%,#4b9ff0 50%,#7bb9ec 100%); }
-:root[data-theme="bunt"][data-sky="bewoelkt"] { --sky-a:#35548a; --sky-b:#8098c2; --accent:#ffe08a; }
-:root[data-theme="bunt"][data-sky="bewoelkt"] .sky { background: radial-gradient(90% 45% at 20% 10%, rgba(180,200,255,.28), transparent 65%), linear-gradient(180deg,#35548a 0%,#5b7bb0 55%,#8098c2 100%); }
-:root[data-theme="bunt"][data-sky="regen"]    { --sky-a:#08384c; --sky-b:#1f8590; --accent:#8fe6ff; --wet:#9fe4ff; }
-:root[data-theme="bunt"][data-sky="regen"] .sky    { background: radial-gradient(100% 50% at 15% 100%, rgba(60,220,200,.28), transparent 65%), linear-gradient(180deg,#08384c 0%,#0f5a6c 50%,#1f8590 100%); }
-:root[data-theme="bunt"][data-sky="gewitter"] { --sky-a:#190f42; --sky-b:#7a3f96; --accent:#ffe45c; }
-:root[data-theme="bunt"][data-sky="gewitter"] .sky { background: radial-gradient(90% 45% at 80% 15%, rgba(255,120,220,.25), transparent 65%), linear-gradient(180deg,#190f42 0%,#43207a 52%,#7a3f96 100%); }
-:root[data-theme="bunt"][data-sky="sturm"]    { --sky-a:#0c3a47; --sky-b:#4fa39a; --accent:#c9f7e6; }
-:root[data-theme="bunt"][data-sky="sturm"] .sky    { background: linear-gradient(165deg,#0c3a47 0%,#1c6f78 50%,#4fa39a 100%); }
-:root[data-theme="bunt"][data-sky="hitze"]    { --sky-a:#e23d2a; --sky-b:#f6983a; --accent:#fff1a8; }
-:root[data-theme="bunt"][data-sky="hitze"] .sky    { background: radial-gradient(110% 55% at 80% 0%, rgba(255,236,150,.55), transparent 60%), linear-gradient(180deg,#e23d2a 0%,#f26d33 50%,#f6983a 100%); }
-:root[data-theme="bunt"][data-sky="schnee"] .sky   { background: linear-gradient(180deg,#9cc3ea 0%,#d5e9fa 55%,#f3f8ff 100%); }
-:root[data-theme="bunt"][data-sky="schnee"]   { --sky-a:#9cc3ea; --panel: rgba(255,255,255,.5); --line: rgba(20,34,47,.16); }
-:root[data-theme="bunt"][data-sky="nebel"] .sky    { background: linear-gradient(180deg,#8c9db3 0%,#c2cedb 55%,#e6ecf2 100%); }
-:root[data-theme="bunt"][data-sky="nebel"]    { --sky-a:#8c9db3; --panel: rgba(255,255,255,.44); --line: rgba(27,33,38,.16); }
-:root[data-theme="bunt"][data-sky="frost"] .sky    { background: linear-gradient(180deg,#44a0e2 0%,#a5d6f6 55%,#e6f5ff 100%); }
-:root[data-theme="bunt"][data-sky="frost"]    { --sky-a:#44a0e2; --panel: rgba(255,255,255,.48); --line: rgba(13,37,54,.16); }
-:root[data-theme="bunt"][data-sky="nacht-klar"]   { --sky-a:#050a2c; --sky-b:#40307c; --accent:#ffe9a8; }
-:root[data-theme="bunt"][data-sky="nacht-klar"] .sky   { background: radial-gradient(90% 45% at 80% 100%, rgba(150,90,220,.35), transparent 65%), linear-gradient(180deg,#050a2c 0%,#1a1f60 55%,#40307c 100%); }
-:root[data-theme="bunt"][data-sky="nacht-trueb"]  { --sky-a:#0c1228; --sky-b:#434a74; --accent:#f0dca0; }
-:root[data-theme="bunt"][data-sky="nacht-trueb"] .sky  { background: linear-gradient(180deg,#0c1228 0%,#252d52 55%,#434a74 100%); }
-:root[data-theme="bunt"][data-sky="nacht-regen"]  { --sky-a:#031a2b; --sky-b:#145a6c; --accent:#8fe6ff; --wet:#9fe4ff; }
-:root[data-theme="bunt"][data-sky="nacht-regen"] .sky  { background: radial-gradient(100% 50% at 15% 100%, rgba(40,200,190,.22), transparent 65%), linear-gradient(180deg,#031a2b 0%,#0a3a4e 52%,#145a6c 100%); }
-:root[data-theme="bunt"][data-sky="nacht-schnee"] { --sky-a:#0f1a3c; --sky-b:#6a7bb0; --accent:#dcecff; }
-:root[data-theme="bunt"][data-sky="nacht-schnee"] .sky { background: linear-gradient(180deg,#0f1a3c 0%,#34477e 55%,#6a7bb0 100%); }
-:root[data-theme="bunt"] footer, :root[data-theme="bunt"] .place, :root[data-theme="bunt"] .hero { text-shadow: 0 1px 4px rgba(0,0,0,.28); }
-:root[data-theme="bunt"]:is([data-sky="schnee"],[data-sky="nebel"],[data-sky="frost"]) :is(footer, .place, .hero) { text-shadow: none; }
-/* Morgenrot und Abendrot, nur bei freundlichem Himmel */
-:root[data-theme="bunt"] .sky::after { opacity: 0; }
-:root[data-theme="bunt"][data-zeit="morgen"] .sky::after { background: linear-gradient(180deg, transparent 25%, rgba(255,120,110,.5) 70%, rgba(255,196,110,.75) 100%); }
-:root[data-theme="bunt"][data-zeit="abend"] .sky::after { background: linear-gradient(180deg, rgba(60,40,140,.35) 0%, rgba(230,80,120,.5) 62%, rgba(255,150,80,.72) 100%); }
-:root[data-theme="bunt"][data-zeit="morgen"]:is([data-sky="sonnig"],[data-sky="heiter"],[data-sky="bewoelkt"],[data-sky="nacht-klar"],[data-sky="nacht-trueb"]) .sky::after,
-:root[data-theme="bunt"][data-zeit="abend"]:is([data-sky="sonnig"],[data-sky="heiter"],[data-sky="bewoelkt"],[data-sky="nacht-klar"],[data-sky="nacht-trueb"]) .sky::after { opacity: 1; }
+/* ---------- Modern ----------
+   Aurora-Himmel: dunkler Grund mit drei weichen Farbwolken je Wetter, die langsam wandern.
+   Karten aus klarem Glas mit Lichtkante, Kacheln und Tage als einzelne Kapseln, Ueberschriften in Kapitaelchen. */
+:root[data-theme="modern"] {
+  color-scheme: dark; --ink: #ffffff; --soft: rgba(236,242,255,.72);
+  --panel: rgba(10,16,36,.34); --line: rgba(255,255,255,.12); --glass-edge: rgba(255,255,255,.2); --lift: rgba(255,255,255,.1);
+  --accent: #ffd60a; --wet: #64d2ff; --glow: rgba(120,160,255,.28);
+  --wolke: #f2f5fb; --wolke2: #c3cde0; --wolke3: #c0b2ff; --tropfen: #64d2ff; --flocke: #ffffff;
+  --m1: rgba(60,120,255,.55); --m2: rgba(0,190,255,.4); --m3: rgba(150,110,255,.35);
+}
+:root[data-theme="modern"][data-sky="sonnig"]       { --sky-a:#04245f; --sky-b:#0a4ea8; --m1:rgba(40,130,255,.65); --m2:rgba(0,200,255,.45); --m3:rgba(255,184,70,.5); --glow:rgba(255,196,70,.32); }
+:root[data-theme="modern"][data-sky="heiter"]       { --sky-a:#0a2a5c; --sky-b:#1a55a0; --m1:rgba(70,140,255,.55); --m2:rgba(120,200,255,.4); --m3:rgba(255,200,110,.4); --glow:rgba(255,206,110,.28); }
+:root[data-theme="modern"][data-sky="bewoelkt"]     { --sky-a:#161d2b; --sky-b:#2a3549; --m1:rgba(90,115,160,.55); --m2:rgba(120,140,180,.4); --m3:rgba(140,120,200,.32); --glow:rgba(160,180,230,.24); --accent:#ffe08a; }
+:root[data-theme="modern"][data-sky="regen"]        { --sky-a:#08162a; --sky-b:#102c48; --m1:rgba(30,120,180,.6); --m2:rgba(40,200,210,.38); --m3:rgba(70,90,190,.42); --glow:rgba(80,200,255,.3); --accent:#7fe0ff; }
+:root[data-theme="modern"][data-sky="gewitter"]     { --sky-a:#0e0720; --sky-b:#24124a; --m1:rgba(120,60,220,.6); --m2:rgba(210,70,180,.42); --m3:rgba(255,200,60,.28); --glow:rgba(200,110,255,.34); }
+:root[data-theme="modern"][data-sky="sturm"]        { --sky-a:#071c22; --sky-b:#0f3a44; --m1:rgba(30,140,140,.55); --m2:rgba(70,210,170,.38); --m3:rgba(50,110,170,.4); --glow:rgba(90,230,200,.3); --accent:#7ee8c8; }
+:root[data-theme="modern"][data-sky="hitze"]        { --sky-a:#3a0b07; --sky-b:#7a240e; --m1:rgba(255,100,50,.55); --m2:rgba(255,180,60,.45); --m3:rgba(255,60,110,.38); --glow:rgba(255,140,70,.34); --accent:#ffe08a; }
+:root[data-theme="modern"][data-sky="schnee"]       { --sky-a:#121c34; --sky-b:#23365c; --m1:rgba(140,180,255,.5); --m2:rgba(180,160,255,.38); --m3:rgba(220,240,255,.3); --glow:rgba(190,215,255,.3); --accent:#e8f1ff; }
+:root[data-theme="modern"][data-sky="nebel"]        { --sky-a:#1b2027; --sky-b:#323a45; --m1:rgba(110,125,145,.5); --m2:rgba(150,160,175,.36); --m3:rgba(90,110,130,.4); --glow:rgba(200,210,225,.22); --accent:#eef1f5; }
+:root[data-theme="modern"][data-sky="frost"]        { --sky-a:#04213d; --sky-b:#0a4170; --m1:rgba(60,190,255,.5); --m2:rgba(150,230,255,.36); --m3:rgba(90,120,255,.4); --glow:rgba(120,220,255,.3); --accent:#a8eaff; }
+:root[data-theme="modern"][data-sky="nacht-klar"]   { --sky-a:#02041a; --sky-b:#0a1240; --m1:rgba(50,60,170,.55); --m2:rgba(120,70,200,.42); --m3:rgba(20,110,170,.38); --glow:rgba(160,140,255,.3); --accent:#ffe9a8; }
+:root[data-theme="modern"][data-sky="nacht-trueb"]  { --sky-a:#080b12; --sky-b:#161c2b; --m1:rgba(50,65,100,.55); --m2:rgba(70,72,120,.42); --m3:rgba(40,70,95,.4); --glow:rgba(140,150,210,.24); --accent:#f0dca0; }
+:root[data-theme="modern"][data-sky="nacht-regen"]  { --sky-a:#030a14; --sky-b:#0b1c30; --m1:rgba(20,80,120,.6); --m2:rgba(30,120,140,.42); --m3:rgba(50,60,130,.42); --glow:rgba(80,190,255,.26); --accent:#7fe0ff; }
+:root[data-theme="modern"][data-sky="nacht-schnee"] { --sky-a:#080f22; --sky-b:#172443; --m1:rgba(90,120,210,.5); --m2:rgba(140,130,220,.4); --m3:rgba(190,210,250,.26); --glow:rgba(180,200,255,.26); --accent:#e8f1ff; }
+/* Farbwolken: zwei grosse weiche Flecken je Ebene, verschoben ueber transform (laeuft auf der Grafikkarte) */
+:root[data-theme="modern"] .sky { overflow: hidden; }
+:root[data-theme="modern"] .sky::before, :root[data-theme="modern"] .sky::after { content: ""; position: absolute; inset: -25%; pointer-events: none; }
+:root[data-theme="modern"] .sky::before { background: radial-gradient(38% 30% at 78% 18%, var(--m3), transparent 70%), radial-gradient(45% 35% at 18% 30%, var(--m1), transparent 72%);
+  animation: aurora1 34s ease-in-out infinite alternate; }
+:root[data-theme="modern"] .sky::after { background: radial-gradient(50% 32% at 70% 78%, var(--m2), transparent 72%), radial-gradient(30% 25% at 25% 85%, var(--m1), transparent 70%);
+  animation: aurora2 41s ease-in-out infinite alternate; }
+@keyframes aurora1 { from { transform: translate3d(-4%, -2%, 0) scale(1); } to { transform: translate3d(5%, 4%, 0) scale(1.12); } }
+@keyframes aurora2 { from { transform: translate3d(4%, 3%, 0) scale(1.08); } to { transform: translate3d(-5%, -3%, 0) scale(.96); } }
+@media (prefers-reduced-motion: reduce) { :root[data-theme="modern"] .sky::before, :root[data-theme="modern"] .sky::after { animation: none; } }
+/* Glas mit Lichtkante: oben links hell, unten rechts ein Hauch, dazwischen fast unsichtbar */
+:root[data-theme="modern"] .card { position: relative; border-radius: 30px; background: var(--panel);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.1), 0 18px 44px rgba(0,0,0,.28); }
+:root[data-theme="modern"] .card::before, :root[data-theme="modern"] .dayrow.open::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(150deg, rgba(255,255,255,.55), rgba(255,255,255,.1) 30%, rgba(255,255,255,.03) 62%, rgba(255,255,255,.22));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+:root[data-theme="modern"] .card h2, :root[data-theme="modern"] .card h3 { font-family: var(--body); font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); }
+:root[data-theme="modern"] .card h2::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin: 0 7px 1px 0; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+:root[data-theme="modern"] .card .lead { font-size: 23px; font-weight: 700; letter-spacing: -.02em; }
+:root[data-theme="modern"] .summary { background: radial-gradient(130% 160% at 0% 0%, var(--glow), transparent 62%), var(--panel); }
+:root[data-theme="modern"] .summary .satz { font-size: 18px; font-weight: 600; }
+/* Oben: grosse, duenne Temperatur mit leichtem Leuchten, Wetterlage als Glaskapsel */
+:root[data-theme="modern"] .hero .temp { font-size: 132px; font-weight: 100; letter-spacing: -.06em; text-shadow: 0 0 60px var(--glow), 0 8px 30px rgba(0,0,0,.25); }
+:root[data-theme="modern"] .hero .cond { color: var(--ink); font-size: 18px; padding: 6px 16px 6px 10px; margin: 4px 0 6px; border-radius: 999px; background: rgba(255,255,255,.1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 6px 18px rgba(0,0,0,.18); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+:root[data-theme="modern"] .hero .cond svg { width: 28px; height: 28px; }
+:root[data-theme="modern"] .hero .range { font-size: 18px; font-weight: 600; }
+/* Kacheln: jede Angabe eine eigene kleine Flaeche (ohne eigenen Unschaerfefilter, das spart Rechenzeit) */
+:root[data-theme="modern"] .tiles { gap: 8px; }
+:root[data-theme="modern"] .tile { background: rgba(255,255,255,.07); border-radius: 18px; padding: 10px 12px 11px; box-shadow: inset 0 1px 0 rgba(255,255,255,.1); min-width: 0; }
+:root[data-theme="modern"] .detail .tiles { gap: 6px; }
+:root[data-theme="modern"] .detail .tile { padding: 8px 8px 9px; border-radius: 14px; }
+:root[data-theme="modern"] .detail .tile .k { font-size: 12px; }
+:root[data-theme="modern"] .detail { border-top: 0; }
+/* Stunden: durchgehender Streifen, die aktuelle Stunde als leuchtende Kapsel */
+:root[data-theme="modern"] .hours { border-radius: 22px; background: rgba(255,255,255,.04); }
+:root[data-theme="modern"] .hour.now { background: linear-gradient(180deg, rgba(255,255,255,.24), rgba(255,255,255,.07)); border-radius: 20px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
+/* Woche: jeder Tag eine eigene Kapsel, heute mit Punkt fuer die aktuelle Temperatur */
+:root[data-theme="modern"] .week { display: flex; flex-direction: column; gap: 6px; overflow: visible; border-radius: 0; }
+:root[data-theme="modern"] .dayrow { position: relative; border-top: 0; border-radius: 18px; padding: 0 12px;
+  background: linear-gradient(90deg, rgba(var(--tint), calc(var(--ta) * .85)), rgba(var(--tint), calc(var(--ta) * .25)) 72%, rgba(var(--tint), .04)), rgba(255,255,255,.05); }
+:root[data-theme="modern"] .dayrow.open { margin: 4px 0; border: 0; border-radius: 22px; padding: 2px 12px 12px; box-shadow: 0 10px 28px rgba(0,0,0,.3);
+  background: linear-gradient(90deg, rgba(var(--tint), calc(var(--ta) * .85)), rgba(var(--tint), calc(var(--ta) * .25)) 72%, rgba(var(--tint), .04)), rgba(255,255,255,.12); }
+:root[data-theme="modern"] .day .bar { height: 7px; border-radius: 4px; background: rgba(255,255,255,.12); }
+:root[data-theme="modern"] .day .bar b { border-radius: 4px; box-shadow: 0 0 10px rgba(255,255,255,.18); }
+:root[data-theme="modern"] .day .bar .jetzt { display: block; }
+.day .bar .jetzt { display: none; position: absolute; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(10,16,36,.55), 0 0 8px rgba(255,255,255,.7); }
+/* Bedienelemente als Glaskapseln */
+:root[data-theme="modern"] .seg { border-radius: 999px; padding: 3px; background: rgba(0,0,0,.18); border: 0; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+:root[data-theme="modern"] .seg button { border-radius: 999px; }
+:root[data-theme="modern"] .seg button[aria-pressed="true"] { background: rgba(255,255,255,.18); box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 4px 12px rgba(0,0,0,.25); }
+:root[data-theme="modern"] .hero .loc { background: rgba(255,255,255,.1); border: 0; box-shadow: inset 0 1px 0 rgba(255,255,255,.22); }
 
 /* ---------- Klassisch: dunkler, nach Apple Wetter im Dunkelmodus ----------
    Himmel satt und dunkel je nach Wetter, Karten als dunkles Glas, Apple Systemfarben (Dunkelmodus).
@@ -389,7 +428,7 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
 </style>
 </head>
 <body>
-<script>try { var t = localStorage.getItem("thema"); if (t !== "wetter") document.documentElement.dataset.theme = t === "gigio" ? "gigio" : "bunt"; } catch (e) { document.documentElement.dataset.theme = "bunt"; }</script>
+<script>try { var t = localStorage.getItem("thema"); if (t !== "wetter") document.documentElement.dataset.theme = t === "gigio" ? "gigio" : "modern"; } catch (e) { document.documentElement.dataset.theme = "modern"; }</script>
 <div class="sky"></div>
 <canvas id="fx" aria-hidden="true"></canvas>
 <div id="splash"><div><img src="icon-180.png" alt=""><h1>GigioWetter</h1><p id="splashText">Wetter wird geladen …</p><div class="ring"></div><button type="button" id="splashBtn">Noch einmal versuchen</button></div></div>
@@ -408,17 +447,17 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   </section>
   <section class="card summary" aria-label="Zusammenfassung"><div class="big" id="icon"></div><p class="satz" id="satz"></p></section>
   <div id="cards"></div>
-  <section class="card thema"><span>Aussehen<small>Hintergrund der App</small></span><div class="seg" id="thema" role="group" aria-label="Aussehen"><button type="button" data-thema="bunt">Kräftig</button><button type="button" data-thema="wetter">Klassisch</button><button type="button" data-thema="gigio">Gigio Fell</button></div></section>
+  <section class="card thema"><span>Aussehen<small>Hintergrund der App</small></span><div class="seg" id="thema" role="group" aria-label="Aussehen"><button type="button" data-thema="modern">Modern</button><button type="button" data-thema="wetter">Klassisch</button><button type="button" data-thema="gigio">Gigio Fell</button></div></section>
   <section class="card catmode"><label for="catmode">Gigio Mode<small>Gigio wohnt auf der Seite</small></label><button type="button" class="feedbtn" id="feedbtn" aria-label="Gigio füttern"><span>Füttern</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12.5h17l-1.6 5.2a2 2 0 0 1-1.9 1.4H7a2 2 0 0 1-1.9-1.4z"/><circle cx="9" cy="10.4" r="1.2" fill="currentColor" stroke="none"/><circle cx="12.4" cy="9.6" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.6" cy="10.6" r="1.2" fill="currentColor" stroke="none"/></svg></button><input type="checkbox" id="catmode" role="switch"></section>
   <div class="place"><div class="ort" id="ort"></div><div class="stand" id="stand"></div><div id="standortHilfe"></div></div>
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611251437"></script>
-<script src="gigio.js?v=202611251437"></script>
+<script src="daten.js?v=202611251457"></script>
+<script src="gigio.js?v=202611251457"></script>
 <script>
-const VERSION = "202611251437";                        // ganz oben, weil render() sie schon beim Start braucht
-const NUMMER = "1.72";                                  // wird von bump.sh hochgezaehlt
+const VERSION = "202611251457";                        // ganz oben, weil render() sie schon beim Start braucht
+const NUMMER = "1.73";                                  // wird von bump.sh hochgezaehlt
 "use strict";
 const $ = id => document.getElementById(id);
 const de = n => String(n).replace(".", ",");
@@ -670,12 +709,12 @@ function cardWoche(d) {
         ${tile("Sonne", de(w.sonne_h), "h")}${tile("Böen bis", w.boe, "km/h")}
         ${tile("Niederschlag", de(w.regen), "mm")}${tile("Regenrisiko", w.regen_prozent != null ? w.regen_prozent : "?", "%")}
         ${w.uv != null ? tile("UV-Index", w.uv, w.uv_text) : ""}${w.luft != null ? `<div class="tile"><div class="k">Luftqualität</div><div class="v klein">${w.luft_text}</div></div>` : ""}
-        ${w.wolken != null ? tile("Bewölkung", w.wolken, "%") + tile("Schneefall ab", w.schneefallgrenze_min != null ? w.schneefallgrenze_min : "?", "m") + `<div class="tile"><div class="k">Art</div><div class="v klein">${w.arten && w.arten.length ? w.arten.join(", ") : "trocken"}</div></div>` : ""}
+        ${w.wolken != null ? tile("Bewölkung", w.wolken, "%") + tile("Schneefall ab", w.schneefallgrenze_min != null ? w.schneefallgrenze_min : "?", "m") + `<div class="tile breit"><div class="k">Art</div><div class="v klein">${w.arten && w.arten.length ? w.arten.join(", ") : "trocken"}</div></div>` : ""}
         </div>${strip}<p class="note">${w.text}</p></div>`;
     }
     const [tint, ta] = tagesfarbe(w);
     return `<div class="dayrow${offen ? " open" : ""}" style="--tint:${tint};--ta:${ta}"><button type="button" class="day" data-day="${w.datum}" aria-expanded="${offen}">
-      <span class="n">${w.tag}<small>${de(w.sonne_h)} h Sonne</small></span>${icon(w.symbol, false)}<span class="p">${p}</span><span class="lo">${grad(w.min)}</span><span class="bar"><b style="left:${l}%;right:${r}%;background:linear-gradient(90deg,${tempFarbe(w.min)},${tempFarbe(w.max)})"></b></span><span class="hi">${grad(w.max)}</span>
+      <span class="n">${w.tag}<small>${de(w.sonne_h)} h Sonne</small></span>${icon(w.symbol, false)}<span class="p">${p}</span><span class="lo">${grad(w.min)}</span><span class="bar"><b style="left:${l}%;right:${r}%;background:linear-gradient(90deg,${tempFarbe(w.min)},${tempFarbe(w.max)})"></b>${w.tag === "Heute" ? `<i class="jetzt" style="left:${Math.min(100, Math.max(0, (d.jetzt.temp - lo) / sp * 100)).toFixed(1)}%"></i>` : ""}</span><span class="hi">${grad(w.max)}</span>
       <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>${detail}</div>`;
   }).join("");
   return `<section class="card"><h2>Diese Woche</h2><div class="week">${rows}</div><p class="note">Tag antippen für Details.</p></section>`;
@@ -1000,7 +1039,7 @@ function setzeThema(t) {
   $("themecolor").content = getComputedStyle(document.documentElement).getPropertyValue("--sky-a").trim();
 }
 $("thema").onclick = e => { const b = e.target.closest("button"); if (b) setzeThema(b.dataset.thema); };
-setzeThema((() => { try { const t = localStorage.getItem("thema"); return ["wetter", "gigio", "bunt"].includes(t) ? t : "bunt"; } catch (e) { return "bunt"; } })());
+setzeThema((() => { try { const t = localStorage.getItem("thema"); return ["wetter", "gigio", "modern"].includes(t) ? t : "modern"; } catch (e) { return "modern"; } })());   // frueheres "Kraeftig" (bunt) wird zu Modern
 
 /* ---------- Gigio Mode ---------- */
 const schalter = $("catmode");
