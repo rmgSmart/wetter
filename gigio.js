@@ -162,8 +162,18 @@ const Gigio = (() => {
   const main = document.querySelector("main"), layer = document.createElement("div"); layer.id = "gigio-layer"; main.appendChild(layer);
   let weather = "regen";
   let lastFed = 0; try { lastFed = +localStorage.getItem("gigio-fed") || 0; } catch (e) {}
-  const BILD = {};                                 // vorladen und dekodieren, damit beim Umschalten nichts aufblitzt
-  for (const n in SPR) { const i = new Image(); i.src = `foto/${n}.png`; if (i.decode) i.decode().catch(() => {}); BILD[n] = i; }
+  // Bilder erst laden, wenn Gigio eingeschaltet wird, dann alle vorab dekodieren (in Zwoelferpaketen),
+  // damit beim Umschalten nichts aufblitzt. Ist Gigio aus, wird kein einziges Bild geladen.
+  const BILD = {}; let bilderP = null;
+  function bilderLaden() {
+    if (bilderP) return bilderP;
+    const namen = Object.keys(SPR);
+    bilderP = (async () => {
+      for (let i = 0; i < namen.length; i += 12)
+        await Promise.all(namen.slice(i, i + 12).map(n => { const b = new Image(); b.src = `foto/${n}.webp`; BILD[n] = b; return b.decode ? b.decode().catch(() => {}) : Promise.resolve(); }));
+    })();
+    return bilderP;
+  }
 
   const root = document.createElement("div"); root.id = "gigio";
   root.innerHTML = `<div class="squash"><div class="box" role="button" tabindex="0" aria-label="Gigio, antippen"><img alt="" draggable="false"></div></div>`;
@@ -176,7 +186,7 @@ const Gigio = (() => {
   const lerp = (a, b, k) => a + (b - a) * k;
 
   /* ---------- Welt ---------- */
-  let plats = [];
+  let plats = [], platsT = -1e9, platsNeu = true;
   function platforms() {
     const m = main.getBoundingClientRect(), list = [];
     const t = document.getElementById("temp"); if (!t) return list; const tr = t.getBoundingClientRect();
@@ -459,7 +469,7 @@ const Gigio = (() => {
   function frame(now) {
     if (!an) return;
     const dt = Math.min(.05, (now - last) / 1000); last = now;
-    plats = platforms();
+    if (platsNeu || now - platsT > 300) { plats = platforms(); platsT = now; platsNeu = false; }
     if (!plats.length) { raf = requestAnimationFrame(frame); return; }
     if (!plats[cat.plat]) cat.plat = 0;
     const p = plats[cat.plat];
@@ -547,12 +557,12 @@ const Gigio = (() => {
     if (h >= 6 && h < 9 && Math.random() < .6) start("fuatta"); else start(weather === "nacht" ? pick(["ruecken", "seite", "kante"]) : "sit");
     raf = requestAnimationFrame(t => { last = t; frame(t); });
   }
-  function anschalten() { if (an) return; an = true; layer.hidden = false; init(); }
+  function anschalten() { if (an) return; an = true; bilderLaden().then(() => { if (!an) return; layer.hidden = false; platsNeu = true; init(); }); }
   function aus() {
     an = false; cancelAnimationFrame(raf); layer.hidden = true; cat.hop = null; cat.walk = null; cat.seq = null; cat.land = 0; cat.queue = [];
     if (cat.bubble) { cat.bubble.remove(); cat.bubble = null; } if (cat.bowl) { cat.bowl.el.remove(); cat.bowl = null; }
     layer.querySelectorAll(".zz, .heart").forEach(e => e.remove());
     const deg = document.getElementById("deg"); if (deg) deg.classList.remove("fall", "back");
   }
-  return { an: anschalten, aus, setWeather(w) { weather = w; }, do(n) { if (!an || cat.hop) return; if (n !== "feed") cat.queue = []; cat.walk = null; start(n); }, state: cat };
+  return { an: anschalten, aus, neu() { platsNeu = true; }, setWeather(w) { weather = w; }, do(n) { if (!an || cat.hop) return; if (n !== "feed") cat.queue = []; cat.walk = null; start(n); }, state: cat };
 })();

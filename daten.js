@@ -223,7 +223,7 @@ const Wetter = (() => {
         richtung: Math.round((Math.atan2(u, w) * 180 / Math.PI + 180) % 360), sonne_min: Math.round((v.sund || 0) / 60),
         taupunkt: r1(taupunkt(v["2t"], v["2r"] ?? 70)), druck: v.msl ? r1(v.msl / 100) : null, strahlung: v.ssrd != null ? Math.round(v.ssrd) : null,
         cape: v.cape != null ? Math.round(v.cape) : null, schneefallgrenze: v.snowlmt != null ? Math.round(v.snowlmt / 50) * 50 : null,
-        art: (v.tp || 0) >= .1 ? PT[Math.round(v.pt || 0)] || null : null, boe_p90: ev["10fg_p90"] != null ? Math.round(ev["10fg_p90"] * 3.6) : null,
+        art: (v.tp || 0) >= .1 ? PT[Math.round(v.pt || 0)] || null : null, art0: (v.tp || 0) > .01 ? PT[Math.round(v.pt || 0)] || null : null, boe_p90: ev["10fg_p90"] != null ? Math.round(ev["10fg_p90"] * 3.6) : null,
         symbol: gr, text: tx, nacht: !(auf <= t && t <= unter),
       };
     });
@@ -235,28 +235,36 @@ const Wetter = (() => {
       const wind = (h.wind_speed_10m[i] || 0) / 3.6, [gr, tx] = wmo(h.weather_code[i]), pp = h.precipitation_probability[i];
       const regen = h.precipitation[i] || 0;
       return {
-        zeit: iso(t), temp: r1(temp), gefuehlt: r1(gefuehlt(temp, rf, wind)), regen: r1(regen), schnee: r1((h.snowfall[i] || 0) * 7),
+        zeit: iso(t), temp: r1(temp), gefuehlt: r1(gefuehlt(temp, rf, wind)), regen: r1(regen), schnee: r1((h.snowfall[i] || 0) * 10 / 7),
         regen_p50: null, regen_p90: null, risiko: pp == null ? null : pp >= 80 ? "sicher" : pp >= 50 ? "wahrscheinlich" : pp >= 20 ? "möglich" : "trocken",
         risiko_prozent: pp, temp_p10: null, temp_p90: null, wolken: Math.round(h.cloud_cover[i] || 0), feuchte: Math.round(rf),
         wind: Math.round(h.wind_speed_10m[i] || 0), boe: Math.round(h.wind_gusts_10m[i] || 0), richtung: Math.round(h.wind_direction_10m[i] || 0),
         sonne_min: Math.round((h.sunshine_duration[i] || 0) / 60), taupunkt: r1(taupunkt(temp, rf)), druck: r1(h.pressure_msl[i]),
         strahlung: h.shortwave_radiation[i] != null ? Math.round(h.shortwave_radiation[i]) : null, cape: h.cape[i] != null ? Math.round(h.cape[i]) : null,
         schneefallgrenze: h.freezing_level_height[i] != null ? Math.max(0, Math.round((h.freezing_level_height[i] - 300) / 50) * 50) : null,
-        art: regen >= .1 ? WMO_ART(h.weather_code[i]) : null, boe_p90: null, symbol: gr, text: tx, nacht: !(auf <= t && t <= unter),
+        art: regen >= .1 ? WMO_ART(h.weather_code[i]) : null, art0: regen > 0 ? WMO_ART(h.weather_code[i]) : null, boe_p90: null, symbol: gr, text: tx, nacht: !(auf <= t && t <= unter),
       };
     }).filter(s => s.temp != null);
   }
 
   /* ---------- Auswertung ---------- */
+  // Niederschlagsart einer Stunde in drei Gruppen, fuer die Wortwahl (Regen, Schnee, Schneeregen)
+  function kat(s) {
+    const a = s.art || s.art0 || "";
+    if (a === "Schnee" || a === "Nasser Schnee" || (!a && s.symbol === "schnee")) return "schnee";
+    if (a === "Schneeregen" || (!a && s.symbol === "schneeregen")) return "schneeregen";
+    return "regen";
+  }
   function regenfenster(st) {
     const out = []; let akt = null, luecke = 0;
     for (const s of st) {
       const ende = new Date(s.zeit);
-      if (s.regen >= .1) { if (!akt) akt = { von: new Date(ende - 36e5), bis: ende, menge: 0, max: 0 }; akt.bis = ende; akt.menge += s.regen; akt.max = Math.max(akt.max, s.regen); luecke = 0; }
+      if (s.regen >= .1) { if (!akt) akt = { von: new Date(ende - 36e5), bis: ende, menge: 0, max: 0, k: {} }; akt.bis = ende; akt.menge += s.regen; akt.max = Math.max(akt.max, s.regen);
+        akt.k[kat(s)] = (akt.k[kat(s)] || 0) + s.regen; luecke = 0; }
       else if (akt && ++luecke > 1) { out.push(akt); akt = null; }
     }
     if (akt) out.push(akt);
-    return out.map(f => ({ von: iso(f.von), bis: iso(f.bis), menge: r1(f.menge), max_pro_stunde: r1(f.max) }));
+    return out.map(f => ({ von: iso(f.von), bis: iso(f.bis), menge: r1(f.menge), max_pro_stunde: r1(f.max), art: Object.entries(f.k).sort((a, b) => b[1] - a[1])[0][0] }));
   }
   function tagessymbol(st) {
     const hell = st.filter(s => { const h = new Date(s.zeit).getHours(); return h >= 6 && h <= 22; }); const b = hell.length ? hell : st;
@@ -275,13 +283,21 @@ const Wetter = (() => {
     return wolken < 30 ? "sonnig" : wolken < 75 ? "heiter" : "bewoelkt";
   }
   const arten = st => [...new Set(st.map(s => s.art).filter(Boolean))];
+  function artenTag(st) {
+    const a = arten(st); if (a.length) return a;
+    if (st.reduce((x, s) => x + s.regen, 0) < .1) return [];
+    return [...new Set(st.filter(s => s.art0).sort((x, y) => y.regen - x.regen).slice(0, 3).map(s => s.art0))];
+  }
+  const WORT = { regen: ["Etwas Regen", "Regen", "Starker Regen"], schnee: ["Etwas Schnee", "Schneefall", "Starker Schneefall"],
+                 schneeregen: ["Etwas Schneeregen", "Schneeregen", "Starker Schneeregen"] };
+  const NOMEN = { regen: "Regen", schnee: "Schnee", schneeregen: "Schneeregen" };
   function satz(jetzt, rest, fenster, tmax, boe, t24 = []) {
     const teile = [], heute = tag(jetzt), stunde = d => `${d.getHours()} Uhr`;
     const fh = fenster.filter(f => f.von.slice(0, 10) <= heute && new Date(f.bis) > jetzt);
     if (fh.length) {
-      const f = fh[0], von = new Date(f.von), bis = new Date(f.bis);
-      const art = f.max_pro_stunde >= 4 ? "Starker Regen" : f.menge >= 1 ? "Regen" : "Etwas Regen";
-      if (von <= jetzt) { teile.push(`${art} bis etwa ${stunde(bis)}`); if (fh[1]) teile.push(`ab ${stunde(new Date(fh[1].von))} wieder Regen`); }
+      const f = fh[0], von = new Date(f.von), bis = new Date(f.bis), W = WORT[f.art] || WORT.regen;
+      const art = f.max_pro_stunde >= (f.art === "regen" ? 4 : 2) ? W[2] : f.menge >= 1 ? W[1] : W[0];
+      if (von <= jetzt) { teile.push(`${art} bis etwa ${stunde(bis)}`); if (fh[1]) teile.push(`ab ${stunde(new Date(fh[1].von))} wieder ${NOMEN[fh[1].art] || "Regen"}`); }
       else if (tag(bis) > heute) teile.push(`${art} ab ${stunde(von)}, in der Nacht bis etwa ${stunde(bis)}`);
       else teile.push(`${art} von ${von.getHours()} bis ${stunde(bis)}`);
     } else {
@@ -360,7 +376,7 @@ const Wetter = (() => {
         const pr = st.map(s => s.risiko_prozent).filter(x => x != null), gr = st.map(s => s.schneefallgrenze).filter(x => x != null);
         Object.assign(e, { min: r1(tmin), max: r1(tmax), regen: r1(st.reduce((a, s) => a + s.regen, 0)), regen_prozent: pr.length ? Math.max(...pr) : o?.precipitation_probability_max ?? null,
           boe: Math.max(...st.map(s => s.boe)), sonne_h: r1(st.reduce((a, s) => a + s.sonne_min, 0) / 60), symbol: g, text: t, quelle: quellen[0],
-          wolken: Math.round(st.reduce((a, s) => a + s.wolken, 0) / st.length), schneefallgrenze_min: gr.length ? Math.min(...gr) : null, arten: arten(st) });
+          wolken: Math.round(st.reduce((a, s) => a + s.wolken, 0) / st.length), schneefallgrenze_min: gr.length ? Math.min(...gr) : null, arten: artenTag(st) });
       } else if (o) {
         let [g, t] = wmo(o.weather_code);
         const sonneH = o.sunshine_duration / 3600;

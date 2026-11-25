@@ -163,7 +163,7 @@ svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
 .detail .tiles { gap: 12px 10px; }
 .detail .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 0; }
 .detail .tile { min-width: 0; }
-.detail .tile .k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detail .tile .k { white-space: normal; overflow: hidden; hyphens: manual; -webkit-hyphens: manual; }
 .detail .tile .v { font-size: 19px; }
 .detail .tile .v.klein { font-size: 14px; overflow-wrap: break-word; }
 .detail .tiles { grid-auto-flow: row dense; }
@@ -464,11 +464,11 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611251519"></script>
-<script src="gigio.js?v=202611251519"></script>
+<script src="daten.js?v=202611251600"></script>
+<script src="gigio.js?v=202611251600"></script>
 <script>
-const VERSION = "202611251519";                        // ganz oben, weil render() sie schon beim Start braucht
-const NUMMER = "1.75";                                  // wird von bump.sh hochgezaehlt
+const VERSION = "202611251600";                        // ganz oben, weil render() sie schon beim Start braucht
+const NUMMER = "1.76";                                  // wird von bump.sh hochgezaehlt
 "use strict";
 const $ = id => document.getElementById(id);
 const de = n => String(n).replace(".", ",");
@@ -560,6 +560,10 @@ function tempFarbe(t) {
   }
   return `rgb(${TFARBE[TFARBE.length - 1][1]})`;
 }
+// Niederschlagsrisiko in Worten: bei GeoSphere gibt es nur grobe Stufen (5, 30, 65, 90 %), eine genaue Prozentzahl waere vorgetaeuscht
+const risikoWort = p => p == null ? "?" : p >= 80 ? "sehr hoch" : p >= 50 ? "hoch" : p >= 20 ? "mittel" : "gering";
+const ART_NAME = { regen: "Regen", schnee: "Schnee", schneeregen: "Schneeregen" };
+const schneeGrenze = m => m < 200 ? `<span class="klein">bis in tiefe Lagen</span>` : m;
 const boeFarbe = b => b >= 80 ? "#ff5e57" : b >= 60 ? "#ff9f43" : b >= 40 ? "#ffd24d" : "";
 let leisteNr = 0;
 // Stundenleiste: die Temperaturen sitzen auf einer durchgehenden Kurve, darunter Regen und Boeen
@@ -610,15 +614,15 @@ function cardRegen(d) {
     const bars = st.map((s, i) => (s.regen > 0 ? `<rect x="${x0 + i * bw + 1.5}" y="${y(s.regen)}" width="${bw - 3}" height="${Math.max(H - y(s.regen), 1.5)}" rx="2.5" fill="var(--wet)"/>` : "") +
       (i % 4 === 3 ? `<text x="${x0 + (i + 1) * bw}" y="${H + 14}" text-anchor="middle">${s.zeit.slice(11, 16)}</text>` : "")).join("");
     const grid = [0, top / 2, top].map(v => `<line x1="${x0}" x2="${W - 32}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${W}" y="${y(v) + 3.5}" text-anchor="end">${de(v)}${v === top ? " mm" : ""}</text>`).join("");
-    return `<section class="card">${kopf(n.text)}
-      <svg class="chart" viewBox="0 -6 ${W} ${H + 24}" role="img" aria-label="Regen je 15 Minuten">${grid}${bars}</svg>
+    return `<section class="card" data-karte="regen">${kopf(n.text)}
+      <svg class="chart" viewBox="0 -6 ${W} ${H + 24}" role="img" aria-label="Niederschlag je 15 Minuten">${grid}${bars}</svg>
       <p class="note">Je 15 Minuten, zusammen ${de(n.summe)} mm in 3 Stunden.</p></section>`;
   }
 
   const st = d.stunden.slice(0, 24);
   const f = d.heute.regenfenster.filter(x => x.von < st[st.length - 1].zeit);
   const nass = st.some(s => s.regen >= 0.1), moeglich = st.some(s => (s.regen_p90 || 0) >= 0.2);
-  if (!nass && !moeglich) return `<section class="card">${kopf("Trocken in den nächsten 24 Stunden")}</section>`;
+  if (!nass && !moeglich) return `<section class="card" data-karte="regen">${kopf("Trocken in den nächsten 24 Stunden")}</section>`;
   const top = oben(Math.max(...st.map(s => Math.max(s.regen, s.regen_p90 || 0)))), H = 60, x0 = 4, bw = (W - 30 - x0) / 24, y = v => H - v / top * H;
   let bars = "", ticks = "";
   st.forEach((s, i) => {
@@ -629,12 +633,13 @@ function cardRegen(d) {
     if (start % 3 === 0) ticks += `<text x="${x + bw / 2}" y="${H + 14}" text-anchor="middle">${start}</text>`;
   });
   const grid = [0, top / 2, top].map(v => `<line x1="${x0}" x2="${W - 28}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${W}" y="${y(v) + 3.5}" text-anchor="end">${de(v)}${v === top ? " mm" : ""}</text>`).join("");
-  let lead = "Regen möglich, aber unsicher";
+  let lead = "Niederschlag möglich, aber unsicher";
   if (f.length) {
     const a = f[0], von = hh(a.von), bis = hh(a.bis), morgen = a.bis.slice(0, 10) !== d.stand.slice(0, 10) && a.von.slice(0, 10) !== a.bis.slice(0, 10);
-    lead = (a.von <= d.stand ? `Regen bis ${bis} Uhr` : `Regen von ${von} bis ${bis} Uhr${morgen ? " früh" : ""}`) + `, ${de(a.menge)} mm`;
+    const wort = ART_NAME[a.art] || "Niederschlag";
+    lead = (a.von <= d.stand ? `${wort} bis ${bis} Uhr` : `${wort} von ${von} bis ${bis} Uhr${morgen ? " früh" : ""}`) + `, ${de(a.menge)} mm`;
   }
-  return `<section class="card">${kopf(lead)}
+  return `<section class="card" data-karte="regen">${kopf(lead)}
     <svg class="chart" viewBox="0 -6 ${W} ${H + 24}" role="img" aria-label="Niederschlag pro Stunde in Millimeter">${grid}${bars}${ticks}</svg>
     <div class="legend klein"><span><i></i>Vorhersage</span><span><i class="maybe"></i>möglich</span></div></section>`;
 }
@@ -661,11 +666,8 @@ function cardDetails(d) {
   const j = d.jetzt, h = d.heute, m = d.messung, na = v => v == null ? "?" : v;
   const tile = (k, v, s = "") => `<div class="tile"><div class="k">${k}</div><div class="v">${v} <small>${s}</small></div></div>`;
   const cape = j.cape == null ? null : j.cape < 100 ? "nicht zu erwarten" : j.cape < 500 ? "wenig wahrscheinlich" : j.cape < 1500 ? "möglich" : "wahrscheinlich";
-  const REGEN = { trocken: "unwahrscheinlich", "möglich": "möglich", wahrscheinlich: "wahrscheinlich", sicher: "sehr wahrscheinlich" };
   const ri = v => RICHT[Math.round(v / 45) % 8];
   const t = [];
-  t.push(tile("Tiefst und Höchstwert", grad(h.min) + " / " + grad(h.max)));
-  t.push(tile("Gefühlt", grad(j.gefuehlt)));
   if (m && m.wind != null) t.push(tile("Wind gemessen", m.wind, "km/h" + (m.richtung != null && m.wind > 2 ? " aus " + ri(m.richtung) : "")));
   else t.push(tile("Wind", j.wind, "km/h aus " + ri(j.richtung)));
   t.push(tile(m && m.boe != null ? "Böen gemessen" : "Böen jetzt", m && m.boe != null ? m.boe : j.boe, "km/h"));
@@ -675,13 +677,13 @@ function cardDetails(d) {
   t.push(tile("Bewölkung", j.wolken, "%"));
   const druck = m && m.druck != null ? m.druck : j.druck;
   t.push(tile("Luftdruck", druck != null ? Math.round(druck) : "?", "hPa" + (h.drucktrend ? ", " + h.drucktrend : "")));
-  t.push(tile("Regen bis Mitternacht", de(h.regen_rest), "mm"));
-  if (j.risiko) t.push(tile("Regen in dieser Stunde", `<span class="klein">${REGEN[j.risiko] || j.risiko}</span>`));
+  t.push(tile("Niederschlag bis Mitternacht", de(h.regen_rest), "mm"));
+  if (j.risiko_prozent != null) t.push(tile("Niederschlagsrisiko jetzt", `<span class="klein">${risikoWort(j.risiko_prozent)}</span>`));
   t.push(tile("Sonnenschein heute", de(h.sonne_h), "Stunden"));
   if (d.uv) t.push(tile("UV-Index heute", d.uv.max ?? d.uv.jetzt, d.uv.text + (d.uv.jetzt != null && d.uv.max != null && !d.nacht ? ", jetzt " + d.uv.jetzt : "")));
-  if (d.luft) t.push(tile("Luftqualität", `<span class="klein">${d.luft.text}</span>`, d.luft.jetzt != null ? "Index " + d.luft.jetzt : ""));
+  if (d.luft) t.push(tile("Luftqualität jetzt", `<span class="klein">${d.luft.text}</span>`, d.luft.jetzt != null ? "Index " + d.luft.jetzt : ""));
   if (!d.nacht && j.strahlung != null) t.push(tile("Sonnenstrahlung", j.strahlung, "W/m²"));
-  if (j.schneefallgrenze != null && j.schneefallgrenze < 1200) t.push(tile("Schneefallgrenze", j.schneefallgrenze, "m"));
+  if (j.schneefallgrenze != null && j.schneefallgrenze < 1200) t.push(tile("Schneefallgrenze", schneeGrenze(j.schneefallgrenze), j.schneefallgrenze < 200 ? "" : "m"));
   if (cape && j.cape >= 100) t.push(tile("Gewitter", `<span class="klein">${cape}</span>`));
   const kopf = m ? `<p class="messkopf">Messwerte der nächsten Station: ${m.station}, ${de(m.km)} km entfernt, ${m.zeit.slice(11, 16)} Uhr</p>` : "";
   const pollen = d.pollen && d.pollen.length ? `<p class="pollen">Pollen heute: ${d.pollen.map(p => `<b>${p.name}</b> ${p.stufe}`).join(", ")}</p>` : "";
@@ -709,7 +711,7 @@ function cardWoche(d) {
   const tile = (k, v, e = "") => `<div class="tile"><div class="k">${k}</div><div class="v">${v} <small>${e}</small></div></div>`;
   const rows = d.woche.map(w => {
     const l = (w.min - lo) / sp * 100, r = (hi - w.max) / sp * 100, offen = openDay === w.datum;
-    const p = w.regen >= 0.1 ? `${de(w.regen)} mm${w.regen_prozent != null ? "<br>" + w.regen_prozent + " %" : ""}` : "";
+    const p = w.regen >= 0.1 ? `${de(w.regen)} mm${w.regen_prozent != null ? "<br>" + risikoWort(w.regen_prozent) : ""}` : "";
     let detail = "";
     if (offen) {
       let st = d.stunden.filter(s => s.zeit.slice(0, 10) === w.datum);
@@ -718,9 +720,9 @@ function cardWoche(d) {
       detail = `<div class="detail"><div class="tiles">
         ${tile("Aufgang", w.sonnenaufgang)}${tile("Untergang", w.sonnenuntergang)}
         ${tile("Sonne", de(w.sonne_h), "h")}${tile("Böen bis", w.boe, "km/h")}
-        ${tile("Niederschlag", de(w.regen), "mm")}${tile("Regenrisiko", w.regen_prozent != null ? w.regen_prozent : "?", "%")}
-        ${w.uv != null ? tile("UV-Index", w.uv, w.uv_text) : ""}${w.luft != null ? `<div class="tile"><div class="k">Luftqualität</div><div class="v klein">${w.luft_text}</div></div>` : ""}
-        ${w.wolken != null ? tile("Bewölkung", w.wolken, "%") + tile("Schneefall ab", w.schneefallgrenze_min != null ? w.schneefallgrenze_min : "?", "m") + `<div class="tile breit"><div class="k">Art</div><div class="v klein">${w.arten && w.arten.length ? w.arten.join(", ") : "trocken"}</div></div>` : ""}
+        ${tile("Niederschlag", de(w.regen), "mm")}<div class="tile"><div class="k">Risiko</div><div class="v klein">${risikoWort(w.regen_prozent)}</div></div>
+        ${w.uv != null ? tile("UV-Index", w.uv, w.uv_text) : ""}${w.luft != null ? `<div class="tile"><div class="k">Luftqualität</div><div class="v klein">${w.luft_text} <small>schlechtester Wert</small></div></div>` : ""}
+        ${w.wolken != null ? tile("Bewölkung", w.wolken, "%") + tile("Schnee&shy;fall&shy;grenze", w.schneefallgrenze_min != null ? schneeGrenze(w.schneefallgrenze_min) : "?", w.schneefallgrenze_min != null && w.schneefallgrenze_min < 200 ? "" : "m") + `<div class="tile breit"><div class="k">Art</div><div class="v klein">${w.arten && w.arten.length ? w.arten.join(", ") : w.regen >= .1 ? "Niederschlag" : "trocken"}</div></div>` : ""}
         </div>${strip}<p class="note">${w.text}</p></div>`;
     }
     const [tint, ta] = tagesfarbe(w);
@@ -728,7 +730,7 @@ function cardWoche(d) {
       <span class="n">${w.tag}<small>${de(w.sonne_h)} h Sonne</small></span>${icon(w.symbol, false)}<span class="p">${p}</span><span class="lo">${grad(w.min)}</span><span class="bar"><b style="left:${l}%;right:${r}%;background:linear-gradient(90deg,${tempFarbe(w.min)},${tempFarbe(w.max)})"></b>${w.tag === "Heute" ? `<i class="jetzt" style="left:${Math.min(100, Math.max(0, (d.jetzt.temp - lo) / sp * 100)).toFixed(1)}%"></i>` : ""}</span><span class="hi">${grad(w.max)}</span>
       <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>${detail}</div>`;
   }).join("");
-  return `<section class="card"><h2>Diese Woche</h2><div class="week">${rows}</div><p class="note">Tag antippen für Details.</p></section>`;
+  return `<section class="card" data-karte="woche"><h2>Nächste 7 Tage</h2><div class="week">${rows}</div><p class="note">Tag antippen für Details.</p></section>`;
 }
 
 const LOOKS = [["", "Echt"], ["sonnig", "Sonnig"], ["heiter", "Heiter"], ["bewoelkt", "Bewölkt"], ["regen", "Regen"], ["gewitter", "Gewitter"],
@@ -742,7 +744,11 @@ function cardEntwurf() {
 
 /* ---------- Aufbau ---------- */
 let DATA = null, DEMO = false, look = "", nachtOverride = null, openDay = null, regenView = null;
-function render() {
+// Mehrere Aufrufe kurz hintereinander werden zu einem Aufbau im naechsten Bild zusammengefasst
+let renderPlan = 0;
+function render() { if (!renderPlan) renderPlan = requestAnimationFrame(() => { renderPlan = 0; if (DATA) renderJetzt(); }); }
+function renderJetzt() {
+  if (renderPlan) { cancelAnimationFrame(renderPlan); renderPlan = 0; }
   const d = DATA, ch = look || d.charakter, nacht = nachtOverride === null ? d.nacht : nachtOverride;
   document.documentElement.dataset.sky = skyFor(ch, nacht);
   setFx(nacht && FX[ch] === "sun" ? "stars" : FX[ch] || "clouds");
@@ -771,7 +777,7 @@ function render() {
   $("icon").innerHTML = icon(nass ? nass.symbol : d.jetzt.symbol, nass ? nass.nacht : d.nacht);
   $("cond").innerHTML = `${icon(d.jetzt.symbol, d.nacht)}${d.jetzt.text}`;
   $("range").innerHTML = `H: ${grad(mess ? Math.max(d.heute.max, mess.temp) : d.heute.max)} &nbsp;T: ${grad(mess ? Math.min(d.heute.min, mess.temp) : d.heute.min)} <span>&nbsp;· gefühlt ${grad(d.jetzt.gefuehlt)}</span>`;
-  $("themecolor").content = getComputedStyle(document.documentElement).getPropertyValue("--sky-a").trim();
+  { const cs = getComputedStyle(document.documentElement); $("themecolor").content = cs.getPropertyValue("--sky-a").trim(); fxHell = cs.colorScheme === "light"; }
   const m = mond(new Date(d.stand));
   const mi = t => +t.slice(0, 2) * 60 + +t.slice(3, 5);
   const a = mi(d.heute.sonnenaufgang), u = mi(d.heute.sonnenuntergang), n = mi(d.stand.slice(11, 16)), dauer = u - a;
@@ -794,8 +800,7 @@ function render() {
   $("fuss").innerHTML += `<div class="version">GigioWetter Version ${NUMMER} vom ${VERSION.slice(6, 8)}.${VERSION.slice(4, 6)}.${VERSION.slice(0, 4)}, ${VERSION.slice(8, 10)}:${VERSION.slice(10, 12)} Uhr</div>`;
   const wl = nacht ? "nacht" : ["sonnig", "heiter", "hitze", "frost"].includes(ch) ? "sonne" : ch === "sturm" ? "wind" : "regen";
   Gigio.setWeather(wl);
-  document.querySelectorAll("[data-rv]").forEach(b => b.onclick = () => { regenView = b.dataset.rv; render(); });
-  document.querySelectorAll(".day[data-day]").forEach(b => b.onclick = () => { openDay = openDay === b.dataset.day ? null : b.dataset.day; render(); });
+  Gigio.neu();
   const lk = $("looks");
   if (lk) lk.onclick = e => {
     const b = e.target.closest("button"); if (!b) return;
@@ -892,7 +897,9 @@ $("ortSuche").onkeydown = e => { if (e.key === "Enter") { clearTimeout(suchT); s
 
 /* ---------- Himmel Animation (Canvas) ---------- */
 const cv = $("fx"), cx = cv.getContext("2d");
-let fx = "", parts = [], raf = 0, W = 0, H = 0, flash = 0;
+let fx = "", parts = [], raf = 0, W = 0, H = 0, flash = 0, fxHell = false, fxLetzt = 0, scrollZeit = -1e9;
+// Beim Scrollen kurz anhalten: die Glaskarten muessen dann nicht bei jedem Bild neu weichgezeichnet werden
+addEventListener("scroll", () => { scrollZeit = performance.now(); }, { passive: true });
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const rnd = (a, b) => a + Math.random() * (b - a);
 function size() { const r = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight; cv.width = W * r; cv.height = H * r; cx.setTransform(r, 0, 0, r, 0, 0); }
@@ -911,8 +918,11 @@ function setFx(n) {
   cancelAnimationFrame(raf); frame(0);
 }
 function frame(t) {
+  if (!still) raf = requestAnimationFrame(frame);
+  if (t && (t - fxLetzt < 31 || performance.now() - scrollZeit < 180)) return;     // hoechstens etwa 30 Bilder pro Sekunde, beim Scrollen Pause
+  const k = t && fxLetzt ? Math.min(3, (t - fxLetzt) / 16.7) : 1; fxLetzt = t;      // Bewegung je Bild an die vergangene Zeit anpassen
   cx.clearRect(0, 0, W, H);
-  const light = getComputedStyle(document.documentElement).colorScheme === "light";
+  const light = fxHell;
   const ink = light ? "40,60,80" : "255,255,255";
   if (fx === "sun") {
     const k = 1 + Math.sin(t / 2400) * .04, g = cx.createRadialGradient(W * .86, 60, 0, W * .86, 60, 300 * k);
@@ -921,9 +931,9 @@ function frame(t) {
   }
   if (fx === "rain" || fx === "storm") {
     cx.strokeStyle = `rgba(${ink},.3)`; cx.lineWidth = 1.2; cx.beginPath();
-    for (const p of parts) { cx.moveTo(p.x, p.y); cx.lineTo(p.x - p.l * .22, p.y + p.l); p.y += p.v; p.x -= p.v * .22; if (p.y > H) { p.y = -20; p.x = rnd(0, W + 80); } }
+    for (const p of parts) { cx.moveTo(p.x, p.y); cx.lineTo(p.x - p.l * .22, p.y + p.l); p.y += p.v * k; p.x -= p.v * .22 * k; if (p.y > H) { p.y = -20; p.x = rnd(0, W + 80); } }
     cx.stroke();
-    if (fx === "storm") { if (!still && Math.random() < .004) flash = 1; if (flash > .02) { cx.fillStyle = `rgba(255,255,230,${flash * .35})`; cx.fillRect(0, 0, W, H); flash *= .86; } }
+    if (fx === "storm") { if (!still && Math.random() < .004 * k) flash = 1; if (flash > .02) { cx.fillStyle = `rgba(255,255,230,${flash * .35})`; cx.fillRect(0, 0, W, H); flash *= Math.pow(.86, k); } }
   }
   if (fx === "wind") {
     cx.lineCap = "round"; cx.lineJoin = "round";
@@ -932,7 +942,7 @@ function frame(t) {
         const y = p.y + Math.sin(t / 600 + p.p) * 18, r = t / 380 + p.p;
         cx.save(); cx.translate(p.x, y); cx.rotate(r); cx.scale(1, .45 + .4 * Math.sin(t / 250 + p.p));
         cx.fillStyle = `rgba(${ink},.32)`; cx.beginPath(); cx.ellipse(0, 0, p.s, p.s * .5, 0, 0, 7); cx.fill(); cx.restore();
-        p.x += p.v; p.y += Math.sin(t / 900 + p.p) * .3;
+        p.x += p.v * k; p.y += Math.sin(t / 900 + p.p) * .3 * k;
         if (p.x > W + 30) { p.x = -30; p.y = rnd(0, H); }
         continue;
       }
@@ -947,29 +957,40 @@ function frame(t) {
         cx.arc(ex, ey - r, r, Math.PI / 2, Math.PI * 2.1, true);
       }
       cx.stroke();
-      p.x += p.v;
+      p.x += p.v * k;
       if (p.x > W + 40) { p.x = -p.l - rnd(0, W * .6); p.y = rnd(0, H); }
     }
   }
   if (fx === "snow") {
     cx.fillStyle = light ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.8)";
-    for (const p of parts) { cx.beginPath(); cx.arc(p.x + Math.sin(t / 900 + p.p) * 8, p.y, p.r, 0, 7); cx.fill(); p.y += p.v; if (p.y > H + 4) { p.y = -4; p.x = rnd(0, W); } }
+    for (const p of parts) { cx.beginPath(); cx.arc(p.x + Math.sin(t / 900 + p.p) * 8, p.y, p.r, 0, 7); cx.fill(); p.y += p.v * k; if (p.y > H + 4) { p.y = -4; p.x = rnd(0, W); } }
   }
   if (fx === "stars") for (const p of parts) { cx.fillStyle = `rgba(255,255,255,${.45 + Math.sin(t / 700 + p.p) * .35})`; cx.beginPath(); cx.arc(p.x, p.y, p.r, 0, 7); cx.fill(); }
   if (fx === "clouds" || fx === "fog") for (const p of parts) {
     const g = cx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
     g.addColorStop(0, `rgba(255,255,255,${p.a})`); g.addColorStop(1, "rgba(255,255,255,0)");
     cx.fillStyle = g; cx.save(); cx.translate(0, p.y * .45); cx.scale(1, .55); cx.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2); cx.restore();
-    p.x += p.v; if (p.x - p.r > W) p.x = -p.r;
+    p.x += p.v * k; if (p.x - p.r > W) p.x = -p.r;
   }
-  if (!still) raf = requestAnimationFrame(frame);
 }
 addEventListener("resize", () => { size(); const f = fx; fx = ""; setFx(f); });
 size();
-try { DATA = JSON.parse(localStorage.getItem("letzte")); if (DATA) render(); } catch (e) {}   // letzten Stand sofort zeigen
-// Beim Start sofort den letzten Stand dieses Orts zeigen, frische Daten kommen im Hintergrund
-{ const c = lese(ortKey(ORTWAHL), null);
-  if (c && c.stand && Date.now() - new Date(c.stand).getTime() < 12 * 36e5) { DATA = c; laedt = true; render(); laedt = false; } }
+// Beim Start sofort den letzten Stand zeigen (der des gewaehlten Orts, wenn er juenger als 12 Stunden ist), ein einziger Aufbau.
+// Frische Daten kommen im Hintergrund.
+{ const c = lese(ortKey(ORTWAHL), null), l = c && c.stand && Date.now() - new Date(c.stand).getTime() < 12 * 36e5 ? c : lese("letzte", null);
+  if (l && l.stand) { DATA = l; laedt = true; try { renderJetzt(); } catch (e) {} laedt = false; } }
+// Tag aufklappen und Regenansicht wechseln: nur die betroffene Karte neu bauen, die Stundenstreifen bleiben, wo sie sind
+function ersetze(k, f) {
+  const alt = document.querySelector(`[data-karte="${k}"]`), html = alt && DATA ? f(DATA) : "";
+  if (!html) return render();
+  alt.outerHTML = html; Gigio.neu();
+}
+$("cards").addEventListener("click", e => {
+  const tag = e.target.closest(".day[data-day]");
+  if (tag) { openDay = openDay === tag.dataset.day ? null : tag.dataset.day; return ersetze("woche", cardWoche); }
+  const rv = e.target.closest("[data-rv]");
+  if (rv) { regenView = rv.dataset.rv; ersetze("regen", cardRegen); }
+});
 load();
 // Automatisch neu laden, sobald die Daten aelter als 15 Minuten sind. iOS haelt Zeitgeber im Hintergrund an,
 // deshalb wird zusaetzlich beim Zurueckkehren in die App, beim Fokus und wenn das Netz wieder da ist geprueft.
@@ -989,7 +1010,8 @@ addEventListener("online", frisch);
 async function pruefeVersion() {
   try {
     const r = await fetch("version.json?" + Date.now(), { cache: "no-store" }), j = await r.json();
-    if (j.v && j.v !== VERSION) location.replace(location.pathname + "?v=" + j.v);
+    // neue Version: frisch laden (der Zwischenspeicher holt ?v= immer aus dem Netz); nie zweimal fuer dieselbe Version
+    if (j.v && j.v !== VERSION && new URLSearchParams(location.search).get("v") !== j.v) location.replace(location.pathname + "?v=" + j.v);
   } catch (e) {}
 }
 pruefeVersion();
@@ -1047,22 +1069,22 @@ function setzeThema(t) {
   if (t === "wetter") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
   try { localStorage.setItem("thema", t); } catch (e) {}
   document.querySelectorAll("#thema button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.thema === t)));
-  $("themecolor").content = getComputedStyle(document.documentElement).getPropertyValue("--sky-a").trim();
+  const cs = getComputedStyle(document.documentElement); $("themecolor").content = cs.getPropertyValue("--sky-a").trim(); fxHell = cs.colorScheme === "light";
 }
 $("thema").onclick = e => { const b = e.target.closest("button"); if (b) setzeThema(b.dataset.thema); };
 setzeThema((() => { try { const t = localStorage.getItem("thema"); return ["wetter", "gigio", "modern"].includes(t) ? t : "modern"; } catch (e) { return "modern"; } })());   // frueheres "Kraeftig" (bunt) wird zu Modern
 
 /* ---------- Gigio Mode ---------- */
 const schalter = $("catmode");
-function katze(an) {
+function katze(an, spaeter = false) {
   document.documentElement.classList.toggle("cat-on", an);
   try { localStorage.setItem("katzenmodus", an ? "1" : "0"); } catch (e) {}
-  if (an) requestAnimationFrame(() => Gigio.an()); else Gigio.aus();
+  if (an) setTimeout(() => requestAnimationFrame(() => Gigio.an()), spaeter ? 1200 : 0); else Gigio.aus();
 }
 try { schalter.checked = localStorage.getItem("katzenmodus") === "1"; } catch (e) {}
 schalter.addEventListener("change", () => katze(schalter.checked));
 $("feedbtn").addEventListener("click", () => Gigio.do("feed"));
-katze(schalter.checked);
+katze(schalter.checked, true);
 </script>
 </body>
 </html>
