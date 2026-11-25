@@ -264,8 +264,8 @@ const Wetter = (() => {
         akt.k[kat(s)] = (akt.k[kat(s)] || 0) + s.regen; luecke = 0; }
       else if (akt && ++luecke > 1) { out.push(akt); akt = null; }
     }
-    if (akt) out.push(akt);
-    return out.map(f => ({ von: iso(f.von), bis: iso(f.bis), menge: r1(f.menge), max_pro_stunde: r1(f.max), art: Object.entries(f.k).sort((a, b) => b[1] - a[1])[0][0] }));
+    if (akt) { if (!luecke) akt.offen = true; out.push(akt); }
+    return out.map(f => ({ von: iso(f.von), bis: iso(f.bis), menge: r1(f.menge), max_pro_stunde: r1(f.max), art: Object.entries(f.k).sort((a, b) => b[1] - a[1])[0][0], offen: !!f.offen }));
   }
   function tagessymbol(st) {
     const hell = st.filter(s => { const h = new Date(s.zeit).getHours(); return h >= 6 && h <= 22; }); const b = hell.length ? hell : st;
@@ -292,14 +292,23 @@ const Wetter = (() => {
   const WORT = { regen: ["Etwas Regen", "Regen", "Starker Regen"], schnee: ["Etwas Schnee", "Schneefall", "Starker Schneefall"],
                  schneeregen: ["Etwas Schneeregen", "Schneeregen", "Starker Schneeregen"] };
   const NOMEN = { regen: "Regen", schnee: "Schnee", schneeregen: "Schneeregen" };
+  // Ende eines Niederschlags in Worten: heute, in der Nacht, morgen frueh, morgen Abend, oder offen
+  function bisWann(bis, jetzt, offen) {
+    const tage = Math.round((new Date(tag(bis) + "T12:00") - new Date(tag(jetzt) + "T12:00")) / 864e5), h = bis.getHours(), z = `${h} Uhr`;
+    const wtag = tage === 1 ? "morgen " : tage >= 2 ? "übermorgen " : "";
+    if (offen) return `bis mindestens ${wtag}${z}`;
+    if (tage <= 0) return `bis etwa ${z}`;
+    if (tage === 1) return h <= 5 ? `in der Nacht bis etwa ${z}` : h <= 10 ? `bis morgen früh etwa ${z}` : h <= 13 ? `bis morgen Mittag etwa ${z}` : h <= 17 ? `bis morgen Nachmittag etwa ${z}` : `bis morgen Abend etwa ${z}`;
+    return `bis übermorgen etwa ${z}`;
+  }
   function satz(jetzt, rest, fenster, tmax, boe, t24 = []) {
     const teile = [], heute = tag(jetzt), stunde = d => `${d.getHours()} Uhr`;
     const fh = fenster.filter(f => f.von.slice(0, 10) <= heute && new Date(f.bis) > jetzt);
     if (fh.length) {
       const f = fh[0], von = new Date(f.von), bis = new Date(f.bis), W = WORT[f.art] || WORT.regen;
       const art = f.max_pro_stunde >= (f.art === "regen" ? 4 : 2) ? W[2] : f.menge >= 1 ? W[1] : W[0];
-      if (von <= jetzt) { teile.push(`${art} bis etwa ${stunde(bis)}`); if (fh[1]) teile.push(`ab ${stunde(new Date(fh[1].von))} wieder ${NOMEN[fh[1].art] || "Regen"}`); }
-      else if (tag(bis) > heute) teile.push(`${art} ab ${stunde(von)}, in der Nacht bis etwa ${stunde(bis)}`);
+      if (von <= jetzt) { teile.push(`${art} ${bisWann(bis, jetzt, f.offen)}`); if (fh[1]) teile.push(`ab ${stunde(new Date(fh[1].von))} wieder ${NOMEN[fh[1].art] || "Regen"}`); }
+      else if (tag(bis) > heute || f.offen) teile.push(`${art} ab ${stunde(von)}, ${bisWann(bis, jetzt, f.offen)}`);
       else teile.push(`${art} von ${von.getHours()} bis ${stunde(bis)}`);
     } else {
       const w = rest.reduce((a, s) => a + s.wolken, 0) / Math.max(rest.length, 1);
@@ -389,7 +398,7 @@ const Wetter = (() => {
       } else continue;
       woche.push(e);
     }
-    const fenster = regenfenster(kommend.slice(0, 30)), t0 = woche[0], boeRest = Math.max(0, ...rest.map(s => s.boe));
+    const fenster = regenfenster(kommend.slice(0, 48)), t0 = woche[0], boeRest = Math.max(0, ...rest.map(s => s.boe));
     const ord = ["trocken", "möglich", "wahrscheinlich", "sicher"], stufen = rest.map(s => s.risiko).filter(Boolean);
     const [auf, unter] = sonne(jetzt, lat, lon);
     const d0 = aktuell.druck, d3 = kommend[3]?.druck;
