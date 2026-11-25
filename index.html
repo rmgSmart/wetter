@@ -283,6 +283,8 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   --accent: #f6a9bb; --wet: #9fdcff; --glass-edge: rgba(255,255,255,.3); --lift: rgba(255,255,255,.14); }
 :root[data-theme="gigio"] .sky { background: #0b0b0d url(fell.jpg) center top / cover no-repeat; }
 :root[data-theme="gigio"] .hero { text-shadow: 0 1px 6px rgba(0,0,0,.75), 0 0 2px rgba(0,0,0,.6); }
+:root[data-theme="gigio"] .hero .temp { font-weight: 200; text-shadow: 0 2px 12px rgba(0,0,0,.8), 0 0 3px rgba(0,0,0,.6); }
+:root[data-theme="gigio"] .hero .cond, :root[data-theme="gigio"] .hero .loc { background: rgba(13,13,16,.62); }
 :root[data-theme="gigio"] .place, :root[data-theme="gigio"] footer { background: rgba(13,13,16,.72); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); padding: 14px 16px; margin-top: 12px; border-radius: 22px; border: .5px solid var(--line); }
 .thema { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; }
 .thema > span { font-size: 16px; font-weight: 500; }
@@ -357,48 +359,58 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
 @keyframes aurora1 { from { transform: translate3d(-4%, -2%, 0) scale(1); } to { transform: translate3d(5%, 4%, 0) scale(1.12); } }
 @keyframes aurora2 { from { transform: translate3d(4%, 3%, 0) scale(1.08); } to { transform: translate3d(-5%, -3%, 0) scale(.96); } }
 @media (prefers-reduced-motion: reduce) { :root[data-theme="modern"] .sky::before, :root[data-theme="modern"] .sky::after { animation: none; } }
+/* Leuchtfarbe je Wetter (Zusammenfassung, Temperatur), gilt fuer alle Ansichten */
+:root { --glow: rgba(120,160,255,.24); }
+:root[data-sky="sonnig"] { --glow: rgba(255,196,70,.3); }   :root[data-sky="heiter"] { --glow: rgba(255,206,110,.26); }
+:root[data-sky="bewoelkt"] { --glow: rgba(160,180,230,.22); } :root[data-sky="regen"] { --glow: rgba(80,200,255,.26); }
+:root[data-sky="gewitter"] { --glow: rgba(200,110,255,.3); }  :root[data-sky="sturm"] { --glow: rgba(90,230,200,.26); }
+:root[data-sky="hitze"] { --glow: rgba(255,140,70,.3); }      :root[data-sky="schnee"] { --glow: rgba(190,215,255,.26); }
+:root[data-sky="nebel"] { --glow: rgba(200,210,225,.2); }     :root[data-sky="frost"] { --glow: rgba(120,220,255,.26); }
+:root[data-sky^="nacht"] { --glow: rgba(160,140,255,.24); }
+/* ---------- Gestaltung fuer alle Ansichten (urspruenglich aus Modern) ----------
+   Glaskarten mit Lichtkante, Ueberschriften in Kapitaelchen mit Leuchtpunkt, Kacheln, Tage als Kapseln.
+   Die Ansichten unterscheiden sich nur noch in Hintergrund und Farben. */
 /* Glas mit Lichtkante: oben links hell, unten rechts ein Hauch, dazwischen fast unsichtbar */
-:root[data-theme="modern"] .card { position: relative; border-radius: 30px; background: var(--panel);
+.card { position: relative; border-radius: 30px; background: var(--panel);
   box-shadow: inset 0 1px 1px rgba(255,255,255,.1), 0 18px 44px rgba(0,0,0,.28); }
-:root[data-theme="modern"] .card::before, :root[data-theme="modern"] .dayrow.open::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+.card::before, .dayrow.open::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
   background: linear-gradient(150deg, rgba(255,255,255,.55), rgba(255,255,255,.1) 30%, rgba(255,255,255,.03) 62%, rgba(255,255,255,.22));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
-:root[data-theme="modern"] .card h2, :root[data-theme="modern"] .card h3 { font-family: var(--body); font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); }
-:root[data-theme="modern"] .card h2::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin: 0 7px 1px 0; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-:root[data-theme="modern"] .card .lead { font-size: 23px; font-weight: 700; letter-spacing: -.02em; }
-:root[data-theme="modern"] .summary { background: radial-gradient(130% 160% at 0% 0%, var(--glow), transparent 62%), var(--panel); }
-:root[data-theme="modern"] .summary .satz { font-size: 18px; font-weight: 600; }
+.card h2, .card h3 { font-family: var(--body); font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); }
+.card h2::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin: 0 7px 1px 0; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.card .lead { font-size: 23px; font-weight: 700; letter-spacing: -.02em; }
+.summary { background: radial-gradient(130% 160% at 0% 0%, var(--glow), transparent 62%), var(--panel); }
+.summary .satz { font-size: 18px; font-weight: 600; }
 /* Oben: grosse, duenne Temperatur mit leichtem Leuchten, Wetterlage als Glaskapsel */
-:root[data-theme="modern"] .hero .temp { font-size: 132px; font-weight: 100; letter-spacing: -.06em; text-shadow: 0 0 60px var(--glow), 0 8px 30px rgba(0,0,0,.25); }
-:root[data-theme="modern"] .hero .cond { color: var(--ink); font-size: 18px; padding: 6px 16px 6px 10px; margin: 4px 0 6px; border-radius: 999px; background: rgba(255,255,255,.1);
+.hero .temp { font-size: 132px; font-weight: 100; letter-spacing: -.06em; text-shadow: 0 0 60px var(--glow), 0 8px 30px rgba(0,0,0,.25); }
+.hero .cond { color: var(--ink); font-size: 18px; padding: 6px 16px 6px 10px; margin: 4px 0 6px; border-radius: 999px; background: rgba(255,255,255,.1);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 6px 18px rgba(0,0,0,.18); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
-:root[data-theme="modern"] .hero .cond svg { width: 28px; height: 28px; }
-:root[data-theme="modern"] .hero .range { font-size: 18px; font-weight: 600; }
+.hero .cond svg { width: 28px; height: 28px; }
+.hero .range { font-size: 18px; font-weight: 600; }
 /* Kacheln: jede Angabe eine eigene kleine Flaeche (ohne eigenen Unschaerfefilter, das spart Rechenzeit) */
-:root[data-theme="modern"] .tiles { gap: 8px; }
-:root[data-theme="modern"] .tile { background: rgba(255,255,255,.07); border-radius: 18px; padding: 10px 12px 11px; box-shadow: inset 0 1px 0 rgba(255,255,255,.1); min-width: 0; }
-:root[data-theme="modern"] .detail .tiles { gap: 6px; }
-:root[data-theme="modern"] .detail .tile { padding: 8px 8px 9px; border-radius: 14px; }
-:root[data-theme="modern"] .detail .tile .k { font-size: 12px; }
-:root[data-theme="modern"] .detail { border-top: 0; }
+.tiles { gap: 8px; }
+.tile { background: rgba(255,255,255,.07); border-radius: 18px; padding: 10px 12px 11px; box-shadow: inset 0 1px 0 rgba(255,255,255,.1); min-width: 0; }
+.detail .tiles { gap: 6px; }
+.detail .tile { padding: 8px 8px 9px; border-radius: 14px; }
+.detail .tile .k { font-size: 12px; }
+.detail { border-top: 0; }
 /* Stunden: durchgehender Streifen, die aktuelle Stunde als leuchtende Kapsel */
-:root[data-theme="modern"] .hours { border-radius: 22px; background: rgba(255,255,255,.04); }
-:root[data-theme="modern"] .hour.now { background: linear-gradient(180deg, rgba(255,255,255,.24), rgba(255,255,255,.07)); border-radius: 20px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
+.hours { border-radius: 22px; background: rgba(255,255,255,.04); }
+.hour.now { background: linear-gradient(rgba(255,255,255,.13), rgba(255,255,255,.13)), linear-gradient(180deg, rgba(var(--tint), var(--ta)), rgba(var(--tint), calc(var(--ta) * .3))); }
 /* Woche: jeder Tag eine eigene Kapsel, heute mit Punkt fuer die aktuelle Temperatur */
-:root[data-theme="modern"] .week { display: flex; flex-direction: column; gap: 6px; overflow: visible; border-radius: 0; }
-:root[data-theme="modern"] .dayrow { position: relative; border-top: 0; border-radius: 18px; padding: 0 12px;
+.week { display: flex; flex-direction: column; gap: 6px; overflow: visible; border-radius: 0; }
+.dayrow { position: relative; border-top: 0; border-radius: 18px; padding: 0 12px;
   background: linear-gradient(90deg, rgba(var(--tint), calc(var(--ta) * .85)), rgba(var(--tint), calc(var(--ta) * .25)) 72%, rgba(var(--tint), .04)), rgba(255,255,255,.05); }
-:root[data-theme="modern"] .dayrow.open { margin: 4px 0; border: 0; border-radius: 22px; padding: 2px 12px 12px; box-shadow: 0 10px 28px rgba(0,0,0,.3);
+.dayrow.open { margin: 4px 0; border: 0; border-radius: 22px; padding: 2px 12px 12px; box-shadow: 0 10px 28px rgba(0,0,0,.3);
   background: linear-gradient(90deg, rgba(var(--tint), calc(var(--ta) * .85)), rgba(var(--tint), calc(var(--ta) * .25)) 72%, rgba(var(--tint), .04)), rgba(255,255,255,.12); }
-:root[data-theme="modern"] .day .bar { height: 7px; border-radius: 4px; background: rgba(255,255,255,.12); }
-:root[data-theme="modern"] .day .bar b { border-radius: 4px; box-shadow: 0 0 10px rgba(255,255,255,.18); }
-:root[data-theme="modern"] .day .bar .jetzt { display: block; }
-.day .bar .jetzt { display: none; position: absolute; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(10,16,36,.55), 0 0 8px rgba(255,255,255,.7); }
+.day .bar { height: 7px; border-radius: 4px; background: rgba(255,255,255,.12); }
+.day .bar b { border-radius: 4px; box-shadow: 0 0 10px rgba(255,255,255,.18); }
+.day .bar .jetzt { display: block; position: absolute; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(10,16,36,.55), 0 0 8px rgba(255,255,255,.7); }
 /* Bedienelemente als Glaskapseln */
-:root[data-theme="modern"] .seg { border-radius: 999px; padding: 3px; background: rgba(0,0,0,.18); border: 0; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
-:root[data-theme="modern"] .seg button { border-radius: 999px; }
-:root[data-theme="modern"] .seg button[aria-pressed="true"] { background: rgba(255,255,255,.18); box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 4px 12px rgba(0,0,0,.25); }
-:root[data-theme="modern"] .hero .loc { background: rgba(255,255,255,.1); border: 0; box-shadow: inset 0 1px 0 rgba(255,255,255,.22); }
+.seg { border-radius: 999px; padding: 3px; background: rgba(0,0,0,.18); border: 0; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+.seg button { border-radius: 999px; }
+.seg button[aria-pressed="true"] { background: rgba(255,255,255,.18); box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 4px 12px rgba(0,0,0,.25); }
+.hero .loc { background: rgba(255,255,255,.1); border: 0; box-shadow: inset 0 1px 0 rgba(255,255,255,.22); }
 
 /* ---------- Klassisch: dunkler, nach Apple Wetter im Dunkelmodus ----------
    Himmel satt und dunkel je nach Wetter, Karten als dunkles Glas, Apple Systemfarben (Dunkelmodus).
@@ -423,8 +435,6 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
 :root:not([data-theme])[data-sky="nacht-trueb"]  { --sky-a:#10151c; --sky-b:#2a323d; }
 :root:not([data-theme])[data-sky="nacht-regen"]  { --sky-a:#0b1119; --sky-b:#212c39; }
 :root:not([data-theme])[data-sky="nacht-schnee"] { --sky-a:#131d30; --sky-b:#3c4b63; --accent:#ffffff; }
-:root:not([data-theme]) .dayrow.open { --rahmen: rgba(255,255,255,.28); }
-:root:not([data-theme]) .card { box-shadow: inset 0 .5px 0 var(--glass-edge), 0 10px 30px rgba(0,0,0,.22); }
 </style>
 </head>
 <body>
@@ -453,11 +463,11 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611251457"></script>
-<script src="gigio.js?v=202611251457"></script>
+<script src="daten.js?v=202611251510"></script>
+<script src="gigio.js?v=202611251510"></script>
 <script>
-const VERSION = "202611251457";                        // ganz oben, weil render() sie schon beim Start braucht
-const NUMMER = "1.73";                                  // wird von bump.sh hochgezaehlt
+const VERSION = "202611251510";                        // ganz oben, weil render() sie schon beim Start braucht
+const NUMMER = "1.74";                                  // wird von bump.sh hochgezaehlt
 "use strict";
 const $ = id => document.getElementById(id);
 const de = n => String(n).replace(".", ",");
