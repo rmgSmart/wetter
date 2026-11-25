@@ -1,10 +1,16 @@
-// GIGIOWETTER Widget fuer Scriptable (grosses Widget)
+// GIGIOWETTER Widget fuer Scriptable: gross, mittel, klein und fuer den Sperrbildschirm
 // Wird vom kleinen Lader-Skript in Scriptable geholt. Die Wetterdaten kommen aus derselben daten.js wie die Web-App,
 // dadurch zeigt das Widget immer dieselben Werte wie GigioWetter.
+// Widget-Parameter (lange auf das Widget druecken, "Widget bearbeiten"): modern (Vorgabe), klassisch oder gigio.
 
+const START = Date.now(), FRIST = START + 12000;   // Zeitbudget: iOS bricht zu lange Laeufe ab, dann bliebe das alte Bild stehen
 const BASIS = "https://rmgsmart.github.io/wetter/";
 const fm = FileManager.local(), dir = fm.documentsDirectory();
 const datei = n => fm.joinPath(dir, "gigiowetter-" + n);
+const FAMILIE = config.widgetFamily || "large";
+const PARAM = String(args.widgetParameter || "").toLowerCase();
+const LOOK = /klass/.test(PARAM) ? "klassisch" : /gigio|fell/.test(PARAM) ? "gigio" : "modern";
+const SPERR = FAMILIE.startsWith("accessory");
 
 /* ---------- Browser-Ersatz, damit daten.js in Scriptable laeuft ---------- */
 const SPEICHER = datei("speicher.json");
@@ -18,60 +24,77 @@ const localStorage = {
 const sichern = () => { try { fm.writeString(SPEICHER, JSON.stringify(speicher)); } catch (e) {} };
 const setTimeout = (f, ms) => Timer.schedule(Math.max(1, ms || 0), false, f);
 const clearTimeout = t => { try { if (t && t.invalidate) t.invalidate(); } catch (e) {} };
-class AbortController { constructor() { this.signal = { aborted: false }; } abort() { this.signal.aborted = true; } }
+// Abbrechen muss wirklich wirken, sonst haelt eine haengende Anfrage das ganze Widget auf
+class AbortController {
+  constructor() { const s = { aborted: false, f: [] }; s.addEventListener = (n, f) => s.f.push(f); this.signal = s; }
+  abort() { if (this.signal.aborted) return; this.signal.aborted = true; this.signal.f.forEach(f => { try { f(); } catch (e) {} }); }
+}
 const warte = ms => new Promise(r => setTimeout(r, ms));
+const warteBis = t => warte(Math.max(1, t - Date.now())).then(() => null);
 const PROTOKOLL = [];                 // fuer die Diagnose beim Start in der Scriptable-App
-async function fetch(url) {
+async function fetch(url, opt = {}) {
   const host = url.split("/")[2] + (url.includes("nwp-v2") ? (url.includes("sund") ? " nwp Zusatz" : " nwp Kern") : url.includes("ensemble") ? " ensemble" : url.includes("nowcast") ? " nowcast" : "");
   const t0 = Date.now();
   try {
-    const a = await fetch0(url);
+    const a = await fetch0(url, opt);
     PROTOKOLL.push(`${host}: ${a.status}, ${Date.now() - t0} ms`); return a;
   }
   catch (e) { PROTOKOLL.push(`${host}: FEHLER ${e}, ${Date.now() - t0} ms`); throw e; }
 }
-async function fetch0(url) {
+async function fetch0(url, opt) {
   const r = new Request(url);
-  r.timeoutInterval = 20;
+  r.timeoutInterval = Math.max(3, Math.min(20, (FRIST + 2000 - Date.now()) / 1000));
   // GeoSphere lehnt Anfragen mit eigener Kennung ab (503), deshalb dort wie Safari auftreten.
   // Nominatim verlangt dagegen eine eindeutige Kennung.
   r.headers = url.includes("nominatim")
     ? { "User-Agent": "GigioWetter-Widget (Scriptable)", "Accept": "application/json" }
     : { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1", "Accept": "application/json, text/plain, */*", "Accept-Language": "de-AT,de;q=0.9" };
-  const text = await r.loadString();
+  const ab = opt.signal ? new Promise((_, nein) => opt.signal.addEventListener("abort", () => nein(new Error("abgebrochen")))) : null;
+  const text = await (ab ? Promise.race([r.loadString(), ab]) : r.loadString());
   const status = r.response && r.response.statusCode ? r.response.statusCode : 200;
   return { ok: status >= 200 && status < 300, status, json: async () => JSON.parse(text), text: async () => text };
 }
 const navigator = { geolocation: { getCurrentPosition(ok, fehler) {
-  try { Location.setAccuracyToHundredMeters(); } catch (e) {}
+  try { Location.setAccuracyToKilometer(); } catch (e) {}          // das Modell rechnet mit 1 km, genauer muss es nicht sein (schneller, schont den Akku)
   Location.current().then(p => { PROTOKOLL.push(`Standort: ${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`); ok({ coords: { latitude: p.latitude, longitude: p.longitude } }); }, e => { PROTOKOLL.push(`Standort: FEHLER ${e}`); fehler && fehler({ code: 2 }); });
 } } };
 const window = { isSecureContext: true };
 
 /* ---------- Daten holen ---------- */
-async function holeCode(name) {
-  const pfad = datei(name);
+// daten.js nur neu laden, wenn es eine neue Version gibt (kleine version.json), sonst die gespeicherte nehmen
+async function holeDaten() {
+  const pfad = datei("daten.js"), vpfad = datei("daten-version.txt");
+  let v = globalThis.GIGIO_VERSION || null;
+  if (!v) { try { const r = new Request(BASIS + "version.json?t=" + Date.now()); r.timeoutInterval = 6; v = (await r.loadJSON()).v; } catch (e) {} }
+  if (v && fm.fileExists(pfad) && fm.fileExists(vpfad) && fm.readString(vpfad) === v) return fm.readString(pfad);
   try {
-    const r = new Request(BASIS + name + "?t=" + Date.now()); r.timeoutInterval = 15;
+    const r = new Request(BASIS + "daten.js?v=" + (v || Date.now())); r.timeoutInterval = 12;
     const code = await r.loadString();
-    if (r.response.statusCode === 200 && code.includes("const Wetter")) { fm.writeString(pfad, code); return code; }
+    if (r.response.statusCode === 200 && code.includes("const Wetter")) { fm.writeString(pfad, code); if (v) fm.writeString(vpfad, v); return code; }
   } catch (e) {}
   return fm.fileExists(pfad) ? fm.readString(pfad) : null;
 }
 
-let d = null, veraltet = false;
-try {
-  const code = await holeCode("daten.js");
-  if (code) {
-    const Wetter = new Function("fetch", "localStorage", "navigator", "window", "setTimeout", "clearTimeout", "AbortController", code + "\nreturn Wetter;")
-      (fetch, localStorage, navigator, window, setTimeout, clearTimeout, AbortController);
-    d = await Promise.race([Wetter.laden(null, { schnell: false }), warte(45000).then(() => null)]);   // im Widget auf den echten Standort warten
-    if (d && d.genau) { const g = await Promise.race([d.genau, warte(20000).then(() => null)]); if (g) d = g; else d.ersatz = "wien"; }   // Wien: genaue Vorhersage abwarten
-    if (d && d.spaeter) await Promise.race([d.spaeter, warte(6000)]);       // Messwerte, falls schnell genug
-    if (d) fm.writeString(datei("letzte.json"), JSON.stringify(d));
-  }
-} catch (e) { console.log("Laden fehlgeschlagen: " + e); }
-if (!d) { try { d = JSON.parse(fm.readString(datei("letzte.json"))); veraltet = true; } catch (e) {} }
+// Laufen mehrere Widgets kurz hintereinander (Home-Bildschirm und Sperrbildschirm), teilen sie sich die Daten der letzten 10 Minuten
+const LETZTE = datei("letzte.json");
+let d = null, veraltet = false, gespeichert = null;
+try { if (fm.fileExists(LETZTE)) gespeichert = JSON.parse(fm.readString(LETZTE)); } catch (e) {}
+if (gespeichert && gespeichert._geholt && Date.now() - gespeichert._geholt < 10 * 60000 && config.runsInWidget) d = gespeichert;
+else {
+  try {
+    const code = await holeDaten();
+    if (code) {
+      const Wetter = new Function("fetch", "localStorage", "navigator", "window", "setTimeout", "clearTimeout", "AbortController", code + "\nreturn Wetter;")
+        (fetch, localStorage, navigator, window, setTimeout, clearTimeout, AbortController);
+      d = await Promise.race([Wetter.laden(null, { schnell: false, widget: true, frist: FRIST }), warteBis(FRIST + 3000)]);   // im Widget auf den echten Standort warten
+      // Wien: genaue Vorhersage bis zur Frist abwarten, sonst bleibt die fuer 1010 Wien (oder die zuletzt geladene genaue)
+      if (d && d.genau) { const g = await Promise.race([d.genau, warteBis(FRIST + 1000)]); if (g) d = g; else d.ersatz = d.ersatz || "wien"; }
+      if (d && d.spaeter) await Promise.race([d.spaeter, warteBis(Math.min(FRIST + 2000, Date.now() + 2500))]);   // Messwerte, falls schnell genug
+      if (d) { d._geholt = Date.now(); fm.writeString(LETZTE, JSON.stringify(d)); }
+    }
+  } catch (e) { console.log("Laden fehlgeschlagen: " + e); }
+  if (!d && gespeichert) { d = gespeichert; veraltet = true; }
+}
 sichern();
 
 /* ---------- Farben und Symbole ---------- */
@@ -102,20 +125,83 @@ function symbol(stack, name, nacht, groesse) {
   img.tintColor = farbe(n ? s[3] : s[1]);
   return img;
 }
-// Farben wie das Aussehen "Klassisch" der App. Der untere Ton ist etwas dunkler als in der App,
-// damit die weisse Schrift im Widget ueberall gut lesbar bleibt.
-function himmel(sym, nacht) {
-  const nass = /regen|gewitter/.test(sym);
-  let p;
-  if (nacht) p = sym === "schnee" ? ["#18243a", "#4d5d76"] : nass ? ["#0e151f", "#283545"] : /klar|heiter/.test(sym) ? ["#070d24", "#24315f"] : ["#161c25", "#353e4a"];
-  else if (sym === "gewitter") p = ["#231f3a", "#4a4763"];
-  else if (nass) p = ["#2f3d4c", "#586b7c"];
-  else if (/schnee/.test(sym)) p = ["#4d5d76", "#7a8899"];
-  else if (sym === "klar") p = ["#1f6fc9", "#79b8ee"];
-  else if (sym === "heiter") p = ["#3878bd", "#8db6dc"];
-  else p = ["#55636f", "#8a959e"];
-  const mix = (a, b, k) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.substr(i, 2), 16) * (1 - k) + parseInt(b.substr(i, 2), 16) * k).toString(16).padStart(2, "0")).join("");
-  return [p[0], mix(p[0], p[1], .5)];
+// Himmel je Wetter wie in der App: Klassisch (Verlauf) und Modern (Verlauf mit Farbwolken)
+function skyFor(ch, nacht) {
+  if (!nacht) return ch;
+  if (["sonnig", "heiter", "hitze", "frost"].includes(ch)) return "nacht-klar";
+  if (["regen", "gewitter", "sturm"].includes(ch)) return "nacht-regen";
+  if (ch === "schnee") return "nacht-schnee";
+  return "nacht-trueb";
+}
+const KLASSISCH = { sonnig: ["#0a3a8c", "#2a6cc0"], heiter: ["#143c74", "#3a6aa4"], bewoelkt: ["#27323f", "#4a5866"], regen: ["#18222d", "#33424f"],
+  gewitter: ["#15122a", "#352f50"], sturm: ["#172632", "#37505d"], hitze: ["#6e2010", "#ad541c"], schnee: ["#2c3c52", "#5f7390"], nebel: ["#30363c", "#5a6168"],
+  frost: ["#123a5c", "#3d6d94"], "nacht-klar": ["#050a1c", "#1a2550"], "nacht-trueb": ["#10151c", "#2a323d"], "nacht-regen": ["#0b1119", "#212c39"], "nacht-schnee": ["#131d30", "#3c4b63"] };
+const MODERN = {
+  sonnig: ["#04245f", "#0a4ea8", [40, 130, 255, .65], [0, 200, 255, .45], [255, 184, 70, .5]], heiter: ["#0a2a5c", "#1a55a0", [70, 140, 255, .55], [120, 200, 255, .4], [255, 200, 110, .4]],
+  bewoelkt: ["#161d2b", "#2a3549", [90, 115, 160, .55], [120, 140, 180, .4], [140, 120, 200, .32]], regen: ["#08162a", "#102c48", [30, 120, 180, .6], [40, 200, 210, .38], [70, 90, 190, .42]],
+  gewitter: ["#0e0720", "#24124a", [120, 60, 220, .6], [210, 70, 180, .42], [255, 200, 60, .28]], sturm: ["#071c22", "#0f3a44", [30, 140, 140, .55], [70, 210, 170, .38], [50, 110, 170, .4]],
+  hitze: ["#3a0b07", "#7a240e", [255, 100, 50, .55], [255, 180, 60, .45], [255, 60, 110, .38]], schnee: ["#121c34", "#23365c", [140, 180, 255, .5], [180, 160, 255, .38], [220, 240, 255, .3]],
+  nebel: ["#1b2027", "#323a45", [110, 125, 145, .5], [150, 160, 175, .36], [90, 110, 130, .4]], frost: ["#04213d", "#0a4170", [60, 190, 255, .5], [150, 230, 255, .36], [90, 120, 255, .4]],
+  "nacht-klar": ["#02041a", "#0a1240", [50, 60, 170, .55], [120, 70, 200, .42], [20, 110, 170, .38]], "nacht-trueb": ["#080b12", "#161c2b", [50, 65, 100, .55], [70, 72, 120, .42], [40, 70, 95, .4]],
+  "nacht-regen": ["#030a14", "#0b1c30", [20, 80, 120, .6], [30, 120, 140, .42], [50, 60, 130, .42]], "nacht-schnee": ["#080f22", "#172443", [90, 120, 210, .5], [140, 130, 220, .4], [190, 210, 250, .26]] };
+const hex2 = n => Math.round(n).toString(16).padStart(2, "0");
+const mischHex = (a, b, k) => "#" + [1, 3, 5].map(i => hex2(parseInt(a.substr(i, 2), 16) * (1 - k) + parseInt(b.substr(i, 2), 16) * k)).join("");
+// Modern: Verlauf in Streifen, darueber weiche Farbwolken aus vielen halbdurchsichtigen Ellipsen (DrawContext kennt keine Verlaeufe)
+function auroraBild(sky, bw, bh) {
+  const P = MODERN[sky] || MODERN.bewoelkt;
+  const dc = new DrawContext(); dc.size = new Size(bw, bh); dc.opaque = true; dc.respectScreenScale = true;
+  const N = 36; for (let i = 0; i < N; i++) { dc.setFillColor(farbe(mischHex(P[0], P[1], i / (N - 1)))); dc.fillRect(new Rect(0, bh * i / N, bw, bh / N + 1)); }
+  const fleck = (fx, fy, rx, ry, [r, g, b, a]) => {
+    const n = 16, ai = 1 - Math.pow(1 - a, 1 / n), c = new Color("#" + hex2(r) + hex2(g) + hex2(b), ai);
+    for (let k = n; k >= 1; k--) { const s = k / n; dc.setFillColor(c); dc.fillEllipse(new Rect(fx * bw - rx * bw * s, fy * bh - ry * bh * s, 2 * rx * bw * s, 2 * ry * bh * s)); }
+  };
+  fleck(.1, .25, .55, .42, P[2]); fleck(.9, .08, .45, .35, P[4]); fleck(.78, .88, .6, .42, P[3]); fleck(.15, .98, .35, .3, P[2]);
+  return dc.getImage();
+}
+// Gigio Fell: das Fellfoto der App, einmal geladen und gespeichert, abgedunkelt, damit die Schrift auf dem weissen Latz lesbar bleibt
+async function fellBild(bw, bh) {
+  const pfad = datei("fell.jpg"); let img = null;
+  try { if (fm.fileExists(pfad)) img = fm.readImage(pfad); } catch (e) {}
+  if (!img) { try { const r = new Request(BASIS + "fell.jpg"); r.timeoutInterval = 8; img = await r.loadImage(); fm.writeImage(pfad, img); } catch (e) {} }
+  if (!img) return null;
+  const dc = new DrawContext(); dc.size = new Size(bw, bh); dc.opaque = true; dc.respectScreenScale = true;
+  const s = Math.max(bw / img.size.width, bh / img.size.height), w = img.size.width * s, h = img.size.height * s;
+  dc.drawImageInRect(img, new Rect((bw - w) / 2, 0, w, h));
+  dc.setFillColor(new Color("#000000", .45)); dc.fillRect(new Rect(0, 0, bw, bh));
+  return dc.getImage();
+}
+// Groesse der Widgets in Punkten je iPhone-Breite (fuer das Hintergrundbild und die Grafik)
+function masse() {
+  let b = 393; try { b = Device.screenSize().width; } catch (e) {}
+  const breit = b >= 440 ? 372 : b >= 428 ? 364 : b >= 414 ? 360 : b >= 402 ? 344 : b >= 390 ? 338 : 329;
+  const klein = b >= 440 ? 174 : b >= 428 ? 170 : b >= 414 ? 169 : b >= 402 ? 162 : b >= 390 ? 158 : 155;
+  return { breit, hoch: Math.round(breit * 1.05), klein };
+}
+async function hintergrund(w) {
+  const sky = skyFor(d.charakter, d.nacht), m = masse();
+  const [bw, bh] = FAMILIE === "small" ? [m.klein, m.klein] : FAMILIE === "medium" ? [m.breit, m.klein] : [m.breit, m.hoch];
+  if (LOOK === "gigio") { const b = await fellBild(bw, bh); if (b) { w.backgroundImage = b; return; } }
+  if (LOOK === "modern") { w.backgroundImage = auroraBild(sky, bw, bh); return; }
+  const [a, b] = KLASSISCH[sky] || KLASSISCH.bewoelkt;
+  const g = new LinearGradient(); g.colors = [farbe(a), farbe(b)]; g.locations = [0, 1]; g.startPoint = new Point(0, 0); g.endPoint = new Point(0, 1); w.backgroundGradient = g;
+}
+// Farbton eines Tages wie in der App: Regen blau, Sonne gelb, Wolken grau
+function tagesTon(t) {
+  if (t.symbol === "gewitter") return ["#a078ff", .5];
+  if (t.symbol === "schnee" && t.regen >= .3) return ["#5c7ab0", .46];
+  const p = t.regen_prozent != null ? t.regen_prozent / 100 : 1, erwartet = t.regen * p;
+  if (p >= .4 && erwartet >= .5) return ["#4092ff", .2 + .35 * Math.min(1, erwartet / 6)];
+  const mi = x => +x.slice(0, 2) * 60 + +x.slice(3, 5), licht = Math.max(1, (mi(t.sonnenuntergang) - mi(t.sonnenaufgang)) / 60), anteil = Math.min(1, (t.sonne_h || 0) / licht);
+  if (anteil >= .25) return ["#ffc43c", .12 + .36 * anteil];
+  return t.symbol === "nebel" ? ["#b0b6bc", .3] : ["#788492", .3 - .2 * anteil / .25];
+}
+// Niederschlagsrisiko in Worten, wie in der App
+const risikoWort = p => p == null ? "" : p >= 80 ? "sehr hoch" : p >= 50 ? "hoch" : p >= 20 ? "mittel" : "gering";
+// Kurztext: kommt in den naechsten 3 Stunden etwas, minutengenau aus dem Nowcast, sonst der erste Satz der Zusammenfassung
+function kurzText() {
+  const n = d.nowcast;
+  if (n && n.regnet && n.text) return n.text + (n.summe >= .1 ? `, ${de(n.summe)} mm in 3 Stunden` : "");
+  return ((d.heute && d.heute.satz) || "").split(/(?<=\.)\s+/)[0].replace(/\.$/, "");
 }
 const de = x => String(x).replace(".", ",");
 const grad = x => Math.round(x) + "°";
@@ -135,7 +221,7 @@ function info(stack, sf, wert, farbeSym) {
   const s = SFSymbol.named(sf); s.applyFont(Font.systemFont(13));
   const i = z.addImage(s.image); i.imageSize = new Size(15, 15); i.tintColor = farbeSym || SOFT;
   z.addSpacer(5);
-  text(z, wert, Font.mediumSystemFont(13.5), WEISS, { zeilen: 1, skala: .7 });
+  text(z, wert, Font.mediumRoundedSystemFont(13.5), WEISS, { zeilen: 1, skala: .7 });
 }
 function tempBox(stack, t) {
   const b = stack.addStack(); b.size = new Size(52, 22); b.cornerRadius = 7; b.backgroundColor = tempFarbe(t); b.centerAlignContent();
@@ -206,24 +292,16 @@ function pfeil(dc, x, y, grad, c) {          // Pfeil in Windrichtung (wohin der
   linie(dc, x + dx * l, y + dy * l, x + dx * l - Math.cos(a - .6) * 3.5, y + dy * l - Math.sin(a - .6) * 3.5, c, 1.5);
   linie(dc, x + dx * l, y + dy * l, x + dx * l - Math.cos(a + .6) * 3.5, y + dy * l - Math.sin(a + .6) * 3.5, c, 1.5);
 }
-function stundenTon(s) {
-  if (s.symbol === "gewitter") return ["150,110,255", .3];
-  if (s.symbol === "schnee" && s.regen >= .1) return ["230,240,255", .3];
-  if (s.regen >= .1) { const k = Math.min(1, s.regen / 3); return ["64,146,255", .18 + .37 * k]; }
-  if (s.nacht) return s.wolken < 50 ? ["40,60,140", .35] : ["120,132,146", .22];
-  if (s.symbol === "nebel") return ["200,205,210", .25];
-  const sonne = s.sonne_min != null ? s.sonne_min / 60 : 1 - s.wolken / 100;
-  if (sonne >= .25 || s.wolken < 40) return ["255,196,60", .14 + .3 * Math.max(sonne, 1 - s.wolken / 100)];
-  return ["120,132,146", .14 + .16 * s.wolken / 100];
-}
 function verlauf(alle, W, H) {
   let st = alle;
   // Gleich breite Spalten alle 3 Stunden, symmetrisch ueber die ganze Breite; die Kurve nutzt dieselbe Einteilung
   const SP = 3, n = Math.min(8, Math.floor((st.length - 1) / SP) + 1), zelle = W / n, x = i => zelle * (i / SP + .5), schritt = zelle / SP;
   const yZeit = 1, ySym = 34, yTxt = 44, yT0 = 63, yT1 = 72, yBoe = H - 15;
   const dc = new DrawContext(); dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
-  // ruhiger Hintergrund
-  dc.setFillColor(farbe("#ffffff", .1)); dc.fillRect(new Rect(0, 0, W, H));
+  // Glasflaeche mit Lichtkante oben, wie die Karten in der App
+  dc.setFillColor(farbe("#ffffff", .08)); dc.fillRect(new Rect(0, 0, W, H));
+  const rand = new Path(); rand.addRoundedRect(new Rect(.5, .5, W - 1, H - 1), 14, 14); dc.addPath(rand); dc.setStrokeColor(farbe("#ffffff", .16)); dc.setLineWidth(1); dc.strokePath();
+  linie(dc, 18, .9, W - 18, .9, farbe("#ffffff", .38), 1.2);
   // Beschriftete Spalten: jetzt und dann alle 3 Stunden
   const zeig = []; for (let k = 0; k < n; k++) zeig.push(k * SP);
   st = st.slice(0, (n - 1) * SP + 1);
@@ -259,30 +337,37 @@ function verlauf(alle, W, H) {
 const w = new ListWidget();
 w.url = BASIS;
 w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
-w.setPadding(12, 16, 8, 16);
 w.spacing = 0;
 
-if (!d) {
-  w.backgroundColor = farbe("#16263a");
-  text(w, "GigioWetter", Font.boldRoundedSystemFont(18));
-  w.addSpacer(6);
-  text(w, "Keine Wetterdaten erreichbar. Das Widget versucht es in 15 Minuten wieder.", Font.systemFont(14), SOFT);
-} else {
-  const j = d.jetzt, h = d.heute;
-  const [oben, unten] = himmel(j.symbol, d.nacht);
-  const g = new LinearGradient(); g.colors = [farbe(oben), farbe(unten)]; g.locations = [0, 1];
-  g.startPoint = new Point(0, 0); g.endPoint = new Point(0, 1); w.backgroundGradient = g;
+function ortZeile(stack, groesse) {
+  const z = stack.addStack(); z.layoutHorizontally(); z.centerAlignContent();
+  const pin = SFSymbol.named("location.fill"); pin.applyFont(Font.systemFont(groesse - 5));
+  const pi = z.addImage(pin.image); pi.imageSize = new Size(groesse - 5, groesse - 5); pi.tintColor = SOFT; z.addSpacer(4);
+  text(z, d.ort, Font.semiboldRoundedSystemFont(groesse), WEISS, { zeilen: 1, skala: .7 });
+}
+function standZeile(stack, groesse = 13.5) {
+  const alter = Math.round((Date.now() - new Date(d.stand).getTime()) / 60000);
+  if (d.ersatz) info(stack, "exclamationmark.triangle.fill", d.ersatz === "alt" ? `GeoSphere ${d.geoStand.slice(11, 16)}` : d.ersatz === "wien" ? "1010 Wien" : "Open-Meteo", farbe("#ffb340"));
+  else info(stack, "clock", alter < 1 ? "gerade" : alter < 60 ? `vor ${alter} min` : `Stand ${d.stand.slice(11, 16)}`, veraltet || alter > 45 ? farbe("#ffb340") : WEISS);
+}
+const jetztTemp = () => { const m = d.messung && Date.now() - new Date(d.messung.zeit).getTime() < 60 * 60000 ? d.messung : null; return m ? m.temp : d.jetzt.temp; };
+function grafik(stack) {
+  const ab = Date.now() - 30 * 60000, st = (d.stunden || []).filter(x => new Date(x.zeit).getTime() >= ab).slice(0, 25);
+  if (st.length <= 3) return false;
+  const gs = stack.addStack(); gs.size = new Size(0, 92); gs.cornerRadius = 14;    // volle Breite, das Bild fuellt den Rahmen
+  gs.backgroundImage = verlauf(st, inhaltBreite() + 8, 92); gs.addSpacer();
+  return true;
+}
 
+function gross() {
+  const j = d.jetzt, h = d.heute;
+  w.setPadding(12, 16, 8, 16);
   // Kopf: Ort, Temperatur, Symbol, Sonne
   const kopf = w.addStack(); kopf.layoutHorizontally(); kopf.topAlignContent();
   const links = kopf.addStack(); links.layoutVertically();
-  const ortZ = links.addStack(); ortZ.layoutHorizontally(); ortZ.centerAlignContent();
-  const pin = SFSymbol.named("location.fill"); pin.applyFont(Font.systemFont(10));
-  const pi = ortZ.addImage(pin.image); pi.imageSize = new Size(11, 11); pi.tintColor = SOFT; ortZ.addSpacer(4);
-  text(ortZ, d.ort, Font.semiboldSystemFont(16), WEISS, { zeilen: 1, skala: .7 });
+  ortZeile(links, 16);
   const tempZ = links.addStack(); tempZ.layoutHorizontally(); tempZ.centerAlignContent();
-  const mess = d.messung && Date.now() - new Date(d.messung.zeit).getTime() < 60 * 60000 ? d.messung : null;
-  text(tempZ, grad(mess ? mess.temp : j.temp), Font.lightRoundedSystemFont(46));
+  text(tempZ, grad(jetztTemp()), Font.lightRoundedSystemFont(46));
   tempZ.addSpacer(8);
   const symS = tempZ.addStack(); symS.layoutVertically();
   symbol(symS, j.symbol, d.nacht, 26);
@@ -292,39 +377,33 @@ if (!d) {
   rechts.addSpacer(2);
   info(rechts, "sunrise.fill", h.sonnenaufgang, farbe("#ffd866"));
   info(rechts, "sunset.fill", h.sonnenuntergang, farbe("#ffb070"));
-  const alter = Math.round((Date.now() - new Date(d.stand).getTime()) / 60000);
-  if (d.ersatz) info(rechts, "exclamationmark.triangle.fill", d.ersatz === "alt" ? `GeoSphere ${d.geoStand.slice(11, 16)}` : d.ersatz === "wien" ? "1010 Wien" : "Open-Meteo", farbe("#ffb340"));
-  else info(rechts, "clock", alter < 1 ? "gerade" : alter < 60 ? `vor ${alter} min` : `Stand ${d.stand.slice(11, 16)}`, veraltet || alter > 45 ? farbe("#ffb340") : WEISS);
+  standZeile(rechts);
 
   w.addSpacer(3);
-  // Den Satz zur Temperatur weglassen, die steht ohnehin in den Kaestchen. So passt der Rest in zwei Zeilen.
-  const satz = (h.satz || "").split(/(?<=\.)\s+/).filter(x => !/^(Höchstwert|Die Temperatur|Bis Mitternacht)/i.test(x)).join(" ");
+  // Zusammenfassung ohne den Satz zur Temperatur (steht in den Kaestchen); kommt bald Niederschlag, minutengenau aus dem Nowcast
+  const teile = (h.satz || "").split(/(?<=\.)\s+/);
+  if (d.nowcast && d.nowcast.regnet && d.nowcast.text) teile[0] = d.nowcast.text + ".";
+  const satz = teile.filter(x => !/^(Höchstwert|Die Temperatur|Bis Mitternacht)/i.test(x)).join(" ");
   const satzS = w.addStack(); satzS.size = new Size(0, 34); satzS.layoutVertically();      // feste Hoehe: zwei Zeilen sind immer sicher
   text(satzS, satz, Font.systemFont(13.5), SOFT, { zeilen: 2, skala: .8 });
   w.addSpacer(5);
 
-  // Die naechsten 24 Stunden als Grafik wie in der App
-  const ab = Date.now() - 30 * 60000, st = (d.stunden || []).filter(x => new Date(x.zeit).getTime() >= ab).slice(0, 25);
-  if (st.length > 3) {
-    const breit = inhaltBreite() + 8, hoch = 92;
-    const gs = w.addStack(); gs.size = new Size(0, hoch); gs.cornerRadius = 14;    // volle Breite, das Bild fuellt den Rahmen
-    gs.backgroundImage = verlauf(st, breit, hoch); gs.addSpacer();
-    w.addSpacer(3);
-  }
+  if (grafik(w)) w.addSpacer(5);
 
-  // Heute, Morgen, Uebermorgen
+  // Heute, Morgen, Uebermorgen als eigene Kapseln, getoent wie die Tage in der App
   const TAGNAME = ["Heute", "Morgen"];
   d.woche.slice(0, 3).forEach((t, i) => {
-    const strich = w.addStack(); strich.size = new Size(0, .7); strich.backgroundColor = LINIE; strich.addSpacer();
-    w.addSpacer(3);
-    const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 47);
-    const a = z.addStack(); a.layoutVertically(); a.size = new Size(86, 0);
-    text(a, TAGNAME[i] || t.tag, Font.boldSystemFont(19), WEISS, { zeilen: 1, skala: .7 });
-    text(a, `${t.datum.slice(8, 10)}.${t.datum.slice(5, 7)}.`, Font.mediumSystemFont(14), SOFT);
-    const b = z.addStack(); b.layoutVertically(); b.size = new Size(54, 0); b.centerAlignContent();
-    const bs = b.addStack(); bs.addSpacer(); symbol(bs, t.symbol, false, 29); bs.addSpacer();
-    if (t.regen_prozent != null && t.regen_prozent >= 10) { const bp = b.addStack(); bp.addSpacer(); text(bp, t.regen_prozent + " %", Font.semiboldSystemFont(13), BLAU); bp.addSpacer(); }
-    z.addSpacer(8);
+    if (i) w.addSpacer(4);
+    const [ton, ta] = tagesTon(t), g = new LinearGradient();
+    g.colors = [farbe(ton, Math.min(.6, ta * .95)), farbe(ton, .06)]; g.locations = [0, 1]; g.startPoint = new Point(0, .5); g.endPoint = new Point(1, .5);
+    const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent(); z.size = new Size(0, 47); z.cornerRadius = 14; z.backgroundGradient = g; z.setPadding(0, 10, 0, 8);
+    const a = z.addStack(); a.layoutVertically(); a.size = new Size(78, 0);
+    text(a, TAGNAME[i] || t.tag, Font.boldRoundedSystemFont(18), WEISS, { zeilen: 1, skala: .7 });
+    text(a, `${t.datum.slice(8, 10)}.${t.datum.slice(5, 7)}.`, Font.mediumSystemFont(13), SOFT);
+    const b = z.addStack(); b.layoutVertically(); b.size = new Size(58, 0); b.centerAlignContent();
+    const bs = b.addStack(); bs.addSpacer(); symbol(bs, t.symbol, false, 27); bs.addSpacer();
+    if (t.regen >= .1 && t.regen_prozent != null) { const bp = b.addStack(); bp.addSpacer(); text(bp, risikoWort(t.regen_prozent), Font.semiboldSystemFont(12), BLAU, { zeilen: 1, skala: .7 }); bp.addSpacer(); }
+    z.addSpacer(6);
     const c = z.addStack(); c.layoutVertically(); c.spacing = 2;
     tempBox(c, t.max); tempBox(c, t.min);
     z.addSpacer();
@@ -332,13 +411,80 @@ if (!d) {
     info(e, "wind", `Böen ${t.boe} km/h`, t.boe >= 60 ? farbe("#ff9f43") : t.boe >= 40 ? farbe("#ffd24d") : SOFT);
     info(e, "drop.fill", t.regen >= .1 ? `${de(t.regen)} mm` : "trocken", t.regen >= .1 ? BLAU : SOFT);
     info(e, "sun.max.fill", `${de(t.sonne_h)} h Sonne`, t.sonne_h >= 1 ? farbe("#ffd866") : SOFT);
-    w.addSpacer(3);
   });
+}
+
+function mittel() {
+  const j = d.jetzt, h = d.heute;
+  w.setPadding(10, 14, 8, 14);
+  // eine Kopfzeile: Temperatur, Symbol, Ort und Wetterlage, rechts Hoechst- und Tiefstwert
+  const kopf = w.addStack(); kopf.layoutHorizontally(); kopf.centerAlignContent();
+  text(kopf, grad(jetztTemp()), Font.lightRoundedSystemFont(34));
+  kopf.addSpacer(6); symbol(kopf, j.symbol, d.nacht, 22); kopf.addSpacer(8);
+  const mitte = kopf.addStack(); mitte.layoutVertically(); mitte.size = new Size(masse().breit - 212, 0);   // feste Breite, damit rechts Platz bleibt
+  ortZeile(mitte, 13);
+  text(mitte, kurzText() || j.text, Font.mediumSystemFont(12), SOFT, { zeilen: 1, skala: .75 });
+  kopf.addSpacer(6);
+  const rechts = kopf.addStack(); rechts.layoutVertically(); rechts.size = new Size(78, 0);
+  const ht = rechts.addStack(); ht.addSpacer(); text(ht, `H ${grad(h.max)}  T ${grad(h.min)}`, Font.semiboldRoundedSystemFont(13), WEISS, { zeilen: 1 });
+  const zs = rechts.addStack(); zs.addSpacer();
+  const alter = Math.round((Date.now() - new Date(d.stand).getTime()) / 60000);
+  text(zs, d.ersatz ? "Ersatzdaten" : alter < 1 ? "gerade" : alter < 60 ? `vor ${alter} min` : `Stand ${d.stand.slice(11, 16)}`, Font.mediumSystemFont(11.5), d.ersatz || veraltet || alter > 45 ? farbe("#ffb340") : SOFT, { zeilen: 1 });
+  w.addSpacer(5);
+  grafik(w);
+}
+
+function klein() {
+  const j = d.jetzt, h = d.heute;
+  w.setPadding(12, 14, 12, 12);
+  ortZeile(w, 13);
+  w.addSpacer(2);
+  const tz = w.addStack(); tz.layoutHorizontally(); tz.centerAlignContent();
+  text(tz, grad(jetztTemp()), Font.lightRoundedSystemFont(42)); tz.addSpacer(); symbol(tz, j.symbol, d.nacht, 26);
+  text(w, j.text, Font.mediumSystemFont(13), SOFT, { zeilen: 1, skala: .7 });
+  text(w, `H ${grad(h.max)}  T ${grad(h.min)}`, Font.semiboldRoundedSystemFont(13.5), WEISS, { zeilen: 1 });
+  w.addSpacer();
+  text(w, kurzText(), Font.mediumSystemFont(11.5), d.nowcast && d.nowcast.regnet ? BLAU : SOFT, { zeilen: 2, skala: .8 });
+}
+
+// Sperrbildschirm: iOS faerbt die Inhalte selbst ein
+function sperrRund() {
+  w.addAccessoryWidgetBackground = true;
+  w.addSpacer();
+  const s = w.addStack(); s.addSpacer(); const sf = SFSymbol.named((SYM[d.jetzt.symbol] || SYM.wolkig)[d.nacht && SYM[d.jetzt.symbol]?.[2] ? 2 : 0]) || SFSymbol.named("cloud.fill");
+  sf.applyFont(Font.systemFont(15)); const im = s.addImage(sf.image); im.imageSize = new Size(17, 17); s.addSpacer();
+  const t = w.addStack(); t.addSpacer(); text(t, grad(jetztTemp()), Font.semiboldRoundedSystemFont(18), WEISS); t.addSpacer();
+  w.addSpacer();
+}
+function sperrRechteck() {
+  const z = w.addStack(); z.layoutHorizontally(); z.centerAlignContent();
+  const sf = SFSymbol.named((SYM[d.jetzt.symbol] || SYM.wolkig)[0]) || SFSymbol.named("cloud.fill");
+  sf.applyFont(Font.systemFont(13)); const im = z.addImage(sf.image); im.imageSize = new Size(15, 15); z.addSpacer(4);
+  text(z, grad(jetztTemp()), Font.semiboldRoundedSystemFont(15), WEISS); z.addSpacer(6);
+  text(z, `H ${grad(d.heute.max)} T ${grad(d.heute.min)}`, Font.mediumSystemFont(12), WEISS, { zeilen: 1, skala: .8 });
+  text(w, kurzText(), Font.mediumSystemFont(12.5), WEISS, { zeilen: 2, skala: .8 });
+}
+function sperrZeile() { text(w, `${grad(jetztTemp())} ${kurzText() || d.jetzt.text}`, Font.mediumSystemFont(12), WEISS, { zeilen: 1 }); }
+
+if (!d) {
+  if (SPERR) text(w, "GigioWetter: keine Daten", Font.mediumSystemFont(12), WEISS, { zeilen: 2 });
+  else {
+    w.backgroundColor = farbe("#16263a"); w.setPadding(14, 16, 14, 16);
+    text(w, "GigioWetter", Font.boldRoundedSystemFont(18));
+    w.addSpacer(6);
+    text(w, "Keine Wetterdaten erreichbar. Das Widget versucht es in 15 Minuten wieder.", Font.systemFont(14), SOFT);
+  }
+} else if (FAMILIE === "accessoryCircular") sperrRund();
+else if (FAMILIE === "accessoryRectangular") sperrRechteck();
+else if (FAMILIE === "accessoryInline") sperrZeile();
+else {
+  await hintergrund(w);
+  if (FAMILIE === "small") klein(); else if (FAMILIE === "medium") mittel(); else gross();
 }
 
 if (config.runsInWidget) Script.setWidget(w);
 else {
-  console.log(PROTOKOLL.join("\n"));          // Diagnose steht im Scriptable-Protokoll
+  console.log(PROTOKOLL.join("\n") + `\nLauf ${((Date.now() - START) / 1000).toFixed(1)} s`);          // Diagnose steht im Scriptable-Protokoll
   await w.presentLarge();
 }
 Script.complete();

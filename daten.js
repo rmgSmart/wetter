@@ -83,8 +83,9 @@ const Wetter = (() => {
   // Vorhersage in zwei Teilen holen: GeoSphere lehnt die grosse Abfrage zeitweise ab (503).
   // Der Kern reicht zur Not allein, die Zusatzwerte fehlen dann nur in den Details.
   // geduldig: lange warten und wiederholen; eilig (es gibt eine frische gespeicherte Vorhersage): kurz und ohne Wiederholung
-  async function nwpHolen(ll, eilig = false) {
-    const ms = eilig ? 8000 : 30000, max = eilig ? 0 : 1;
+  // rest: verbleibende Zeit bis zur Frist (Widget), dann hoechstens so lange warten und nicht wiederholen
+  async function nwpHolen(ll, eilig = false, rest = null) {
+    const ms = Math.min(eilig ? 8000 : 30000, rest || 1e9), max = eilig || rest ? 0 : 1;
     const kernP = hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=2t,tp,tcc,sy,10fg,10u,10v,2r`, ms, 0, max).catch(() => null);
     const extraP = hole(`${GEO}/nwp-v2-1h-1km?${ll}&parameters=sund,sf,pt,snowlmt,msl,ssrd,cape`, ms, 0, max).catch(() => null);
     const kern = await kernP;
@@ -431,9 +432,9 @@ const Wetter = (() => {
     const genau = Promise.race([stP.then(s => {
         const st = wahl ? null : s && s.lat != null ? s : pos;
         if (st && km(st.lat, st.lon, pos.lat, pos.lon) > 1) woanders = true;
-        return ladenDirekt(wahl, { ...opt, geduldig: true, ...(st ? { st } : {}) });
+        return ladenDirekt(wahl, { ...opt, geduldig: !opt.frist, ...(st ? { st } : {}) });
       }), new Promise(r => setTimeout(r, 70000, null))])
-      .then(g => g && (!g.ersatz || woanders) ? g : null).catch(() => null);
+      .then(g => g && (!g.ersatz || woanders || (opt.frist && g.ersatz === "alt" && Date.now() - new Date(g.geoStand).getTime() < 3 * 36e5)) ? g : null).catch(() => null);
     genau.then(g => { if (!g) d.vorlaeufig = false; });
     Object.defineProperty(d, "vorlaeufig", { value: true, writable: true, enumerable: false });
     Object.defineProperty(d, "genau", { value: genau, enumerable: false });
@@ -459,8 +460,9 @@ const Wetter = (() => {
     const omBasis = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&timezone=auto&forecast_days=8`
       + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunshine_duration,uv_index_max&current=uv_index";
     const omStd = omBasis + OM_STD;
-    const omUrl = omStd;                                  // stuendlich auch in Oesterreich: fuellt den Tag auf, an dem die GeoSphere-Vorhersage endet
-    const messP = roh ? Promise.resolve(null) : imGebiet ? messung(lat, lon).catch(() => null) : Promise.resolve(null), luftP = roh ? Promise.resolve(null) : luft(lat, lon).catch(() => null);
+    // stuendlich auch in Oesterreich: fuellt den Tag auf, an dem die GeoSphere-Vorhersage endet. Das Widget zeigt nur drei Tage und braucht das nicht.
+    const omUrl = opt.widget ? omBasis : omStd, rest = opt.frist ? Math.max(1500, opt.frist - Date.now()) : null;
+    const messP = roh ? Promise.resolve(null) : imGebiet ? messung(lat, lon).catch(() => null) : Promise.resolve(null), luftP = roh || opt.widget ? Promise.resolve(null) : luft(lat, lon).catch(() => null);   // Luft und Pollen zeigt das Widget nicht
     // Ensemble (Regenwahrscheinlichkeit) und Nowcast sind oft langsam: nicht darauf warten, sondern nachreichen
     const ensP = roh ? Promise.resolve(roh.ens) : imGebiet ? hole(`${GEO}/ensemble-v2-1h-1km?${ll}&parameters=tp_p10,tp_p50,tp_p90,2t_p10,2t_p90,10fg_p90`).catch(() => null) : Promise.resolve(null);
     const ncP = roh ? Promise.resolve(roh.nc) : imGebiet ? hole(`${GEO}/nowcast-v1-15min-1km?${ll}&parameters=rr,pt,t2m,td`, 20000).catch(() => null) : Promise.resolve(null);
@@ -468,7 +470,7 @@ const Wetter = (() => {
     const ensP2 = ensP.then(x => { if (roh) return x; if (x) geoMerke("ens", lat, lon, x); else { const c = imGebiet ? geoAlt("ens", lat, lon) : null; if (c) return c.daten; } return x; });
     ensP2.then(x => { ens = x; ensDa = true; }); ncP.then(x => { nc = x; ncDa = true; });
     const vorrat = imGebiet && !roh ? geoAlt("nwp", lat, lon) : null, eilig = !opt.geduldig && !!(vorrat && Date.now() - vorrat.t < 3 * 36e5);
-    let [nwp, om] = roh ? [roh.nwp, roh.om] : await Promise.all([imGebiet ? nwpHolen(ll, eilig) : null, hole(omUrl, 15000).catch(() => null)]);
+    let [nwp, om] = roh ? [roh.nwp, roh.om] : await Promise.all([imGebiet ? nwpHolen(ll, eilig, rest) : null, hole(omUrl, Math.min(15000, rest || 1e9)).catch(() => null)]);
     let geoStand = null;                                  // gesetzt, wenn eine aufgehobene GeoSphere-Vorhersage verwendet wird
     if (roh) {}
     else if (imGebiet && nwp) geoMerke("nwp", lat, lon, nwp);
