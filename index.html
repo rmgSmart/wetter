@@ -459,14 +459,14 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
 :root[data-theme="modern"][data-sky="nacht-schnee"] { --p0:#141f38; --p1:#e9eef7; --p2:#ffffff; --p3:#e9eef7; --pmuster: var(--punkte); }
 /* Flaeche, darin eine duenne Linie quer und ein feines Korn wie bei gedrucktem Papier */
 :root[data-theme="modern"] .sky { overflow: hidden; transition: background-color .6s;
-  background: linear-gradient(transparent calc(42% - 2px), var(--p3) calc(42% - 2px) calc(42% + 2px), transparent calc(42% + 2px)),
+  background: linear-gradient(rgba(8,9,12,.52), rgba(8,9,12,.52)), linear-gradient(transparent calc(42% - 2px), var(--p3) calc(42% - 2px) calc(42% + 2px), transparent calc(42% + 2px)),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"),
     var(--p0); }
 /* die grosse Kreisform oben rechts, wandert ganz langsam */
-:root[data-theme="modern"] .sky::before { content: ""; position: absolute; width: 82vw; max-width: 520px; aspect-ratio: 1; right: -22vw; top: 7vh; border-radius: 50%;
-  background: var(--p1); animation: plakatKreis 48s ease-in-out infinite alternate; }
+:root[data-theme="modern"] .sky::before { content: ""; position: absolute; width: 70vw; max-width: 440px; aspect-ratio: 1; right: -20vw; top: 8vh; border-radius: 50%;
+  background: var(--p1); opacity: .38; animation: plakatKreis 48s ease-in-out infinite alternate; }
 /* der Musterblock unten links */
-:root[data-theme="modern"] .sky::after { content: ""; position: absolute; left: -8vw; top: 64vh; width: 66vw; max-width: 420px; height: 52vh; background: var(--pmuster); }
+:root[data-theme="modern"] .sky::after { content: ""; position: absolute; left: -8vw; top: 64vh; width: 66vw; max-width: 420px; height: 52vh; background: var(--pmuster); opacity: .22; }
 @keyframes plakatKreis { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-6vw, 3vh, 0); } }
 @media (prefers-reduced-motion: reduce) { :root[data-theme="modern"] .sky::before { animation: none; } }
 /* Kopf: links, sehr grosse fette Zahl, Wetterlage als Farbstreifen, Ort als schwarzes Etikett */
@@ -528,11 +528,11 @@ html.cat-on .hero .loc { position: absolute; top: 4px; left: 0; right: 0; margin
   <footer id="fuss"></footer>
 </main>
 
-<script src="daten.js?v=202611261634"></script>
-<script src="gigio.js?v=202611261634"></script>
+<script src="daten.js?v=202611261657"></script>
+<script src="gigio.js?v=202611261657"></script>
 <script>
-const VERSION = "202611261634";                        // ganz oben, weil render() sie schon beim Start braucht
-const NUMMER = "1.82";                                  // wird von bump.sh hochgezaehlt
+const VERSION = "202611261657";                        // ganz oben, weil render() sie schon beim Start braucht
+const NUMMER = "1.83";                                  // wird von bump.sh hochgezaehlt
 "use strict";
 const $ = id => document.getElementById(id);
 const de = n => String(n).replace(".", ",");

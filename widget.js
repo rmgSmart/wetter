@@ -153,10 +153,10 @@ function plakatBild(sky, bw, bh) {
   const [f0, f1, , f3] = PLAKAT[sky] || PLAKAT.bewoelkt;
   const dc = new DrawContext(); dc.size = new Size(bw, bh); dc.opaque = true; dc.respectScreenScale = true;
   dc.setFillColor(farbe(f0)); dc.fillRect(new Rect(0, 0, bw, bh));
-  const d0 = Math.max(bw, bh) * .78; dc.setFillColor(farbe(f1)); dc.fillEllipse(new Rect(bw - d0 * .62, -d0 * .28, d0, d0));      // Kreis oben rechts
+  const d0 = Math.max(bw, bh) * .78; dc.setFillColor(new Color(f1, .38)); dc.fillEllipse(new Rect(bw - d0 * .62, -d0 * .28, d0, d0));      // Kreis oben rechts
   // den Musterblock der App laesst das Widget weg: dahinter steht ueberall Schrift
-  dc.setFillColor(farbe(f3)); dc.fillRect(new Rect(0, bh * .58, bw, 3));                                                              // Linie quer
-  dc.setFillColor(new Color("#000000", .22)); dc.fillRect(new Rect(0, 0, bw, bh));                                                  // etwas abdunkeln, damit die Schrift lesbar bleibt
+  dc.setFillColor(new Color(f3, .45)); dc.fillRect(new Rect(0, bh * .58, bw, 3));                                                              // Linie quer
+  dc.setFillColor(new Color("#08090c", .5)); dc.fillRect(new Rect(0, 0, bw, bh));                                                  // etwas abdunkeln, damit die Schrift lesbar bleibt
   return dc.getImage();
 }
 // Groesse der Widgets in Punkten je iPhone-Breite (fuer das Hintergrundbild und die Grafik)
