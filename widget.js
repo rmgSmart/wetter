@@ -1,7 +1,7 @@
 // GIGIOWETTER Widget fuer Scriptable: gross, mittel, klein und fuer den Sperrbildschirm
 // Wird vom kleinen Lader-Skript in Scriptable geholt. Die Wetterdaten kommen aus derselben daten.js wie die Web-App,
 // dadurch zeigt das Widget immer dieselben Werte wie GigioWetter.
-// Widget-Parameter (lange auf das Widget druecken, "Widget bearbeiten"): modern (Vorgabe), klassisch oder gigio.
+// Widget-Parameter (lange auf das Widget druecken, "Widget bearbeiten"): modern (Vorgabe), klassisch oder dark.
 
 const START = Date.now(), FRIST = START + 12000;   // Zeitbudget: iOS bricht zu lange Laeufe ab, dann bliebe das alte Bild stehen
 const BASIS = "https://rmgsmart.github.io/wetter/";
@@ -9,7 +9,7 @@ const fm = FileManager.local(), dir = fm.documentsDirectory();
 const datei = n => fm.joinPath(dir, "gigiowetter-" + n);
 const FAMILIE = config.widgetFamily || "large";
 const PARAM = String(args.widgetParameter || "").toLowerCase();
-const LOOK = /klass/.test(PARAM) ? "klassisch" : /gigio|fell/.test(PARAM) ? "gigio" : "modern";
+const LOOK = /klass/.test(PARAM) ? "klassisch" : /dark|dunkel|gigio|fell/.test(PARAM) ? "dark" : "modern";   // frueher "gigio" (Fell) ist jetzt Dark
 const SPERR = FAMILIE.startsWith("accessory");
 
 /* ---------- Browser-Ersatz, damit daten.js in Scriptable laeuft ---------- */
@@ -136,38 +136,27 @@ function skyFor(ch, nacht) {
 const KLASSISCH = { sonnig: ["#0a3a8c", "#2a6cc0"], heiter: ["#143c74", "#3a6aa4"], bewoelkt: ["#27323f", "#4a5866"], regen: ["#18222d", "#33424f"],
   gewitter: ["#15122a", "#352f50"], sturm: ["#172632", "#37505d"], hitze: ["#6e2010", "#ad541c"], schnee: ["#2c3c52", "#5f7390"], nebel: ["#30363c", "#5a6168"],
   frost: ["#123a5c", "#3d6d94"], "nacht-klar": ["#050a1c", "#1a2550"], "nacht-trueb": ["#10151c", "#2a323d"], "nacht-regen": ["#0b1119", "#212c39"], "nacht-schnee": ["#131d30", "#3c4b63"] };
-const MODERN = {
-  sonnig: ["#04245f", "#0a4ea8", [40, 130, 255, .65], [0, 200, 255, .45], [255, 184, 70, .5]], heiter: ["#0a2a5c", "#1a55a0", [70, 140, 255, .55], [120, 200, 255, .4], [255, 200, 110, .4]],
-  bewoelkt: ["#161d2b", "#2a3549", [90, 115, 160, .55], [120, 140, 180, .4], [140, 120, 200, .32]], regen: ["#08162a", "#102c48", [30, 120, 180, .6], [40, 200, 210, .38], [70, 90, 190, .42]],
-  gewitter: ["#0e0720", "#24124a", [120, 60, 220, .6], [210, 70, 180, .42], [255, 200, 60, .28]], sturm: ["#071c22", "#0f3a44", [30, 140, 140, .55], [70, 210, 170, .38], [50, 110, 170, .4]],
-  hitze: ["#3a0b07", "#7a240e", [255, 100, 50, .55], [255, 180, 60, .45], [255, 60, 110, .38]], schnee: ["#121c34", "#23365c", [140, 180, 255, .5], [180, 160, 255, .38], [220, 240, 255, .3]],
-  nebel: ["#1b2027", "#323a45", [110, 125, 145, .5], [150, 160, 175, .36], [90, 110, 130, .4]], frost: ["#04213d", "#0a4170", [60, 190, 255, .5], [150, 230, 255, .36], [90, 120, 255, .4]],
-  "nacht-klar": ["#02041a", "#0a1240", [50, 60, 170, .55], [120, 70, 200, .42], [20, 110, 170, .38]], "nacht-trueb": ["#080b12", "#161c2b", [50, 65, 100, .55], [70, 72, 120, .42], [40, 70, 95, .4]],
-  "nacht-regen": ["#030a14", "#0b1c30", [20, 80, 120, .6], [30, 120, 140, .42], [50, 60, 130, .42]], "nacht-schnee": ["#080f22", "#172443", [90, 120, 210, .5], [140, 130, 220, .4], [190, 210, 250, .26]] };
+// Modern als Plakat wie in der App: Flaeche, Kreis, Linie (Farben je Wetter: Flaeche, Kreis, Muster, Akzent, Musterart)
+const PLAKAT = { sonnig: ["#1d3fd1", "#ffc400", "#ff4a2a", "#ffc400", "voll"], heiter: ["#2b5fd9", "#ffd84d", "#f2efe6", "#ffd84d", "voll"],
+  bewoelkt: ["#3b4250", "#c9ccd2", "#e9e4d8", "#e9e4d8", "voll"], regen: ["#12305e", "#5fa8ff", "#8fd0ff", "#8fd0ff", "streifen"],
+  gewitter: ["#22123f", "#ffd400", "#ff3d7f", "#ffd400", "streifen"], sturm: ["#0f3b3d", "#e9e4d8", "#2fd1b0", "#2fd1b0", "schraeg"],
+  hitze: ["#b8260f", "#ffd400", "#ff8a00", "#ffd400", "voll"], schnee: ["#2d4466", "#f4f1ea", "#ffffff", "#f4f1ea", "punkte"],
+  nebel: ["#4a4f57", "#9aa0a8", "#c5c9cf", "#d9dce0", "baender"], frost: ["#0e4a7a", "#bfeeff", "#ffffff", "#bfeeff", "punkte"],
+  "nacht-klar": ["#0b1030", "#f4efe0", "#3a4bd6", "#f4efe0", "voll"], "nacht-trueb": ["#15181f", "#5d6472", "#2b313c", "#c9ccd2", "baender"],
+  "nacht-regen": ["#08162e", "#2f6fd0", "#5fa8ff", "#8fd0ff", "streifen"], "nacht-schnee": ["#141f38", "#e9eef7", "#ffffff", "#e9eef7", "punkte"] };
+// Dark: fast schwarz, unten ein Hauch Wetterfarbe
+const DARK = { sonnig: "#16140f", heiter: "#16140f", hitze: "#19100d", regen: "#0d1319", "nacht-regen": "#0d1319", gewitter: "#120f18", sturm: "#0d1414",
+  schnee: "#10141a", "nacht-schnee": "#10141a", frost: "#10141a", "nacht-klar": "#0c0d16" };
 const hex2 = n => Math.round(n).toString(16).padStart(2, "0");
 const mischHex = (a, b, k) => "#" + [1, 3, 5].map(i => hex2(parseInt(a.substr(i, 2), 16) * (1 - k) + parseInt(b.substr(i, 2), 16) * k)).join("");
-// Modern: Verlauf in Streifen, darueber weiche Farbwolken aus vielen halbdurchsichtigen Ellipsen (DrawContext kennt keine Verlaeufe)
-function auroraBild(sky, bw, bh) {
-  const P = MODERN[sky] || MODERN.bewoelkt;
+function plakatBild(sky, bw, bh) {
+  const [f0, f1, , f3] = PLAKAT[sky] || PLAKAT.bewoelkt;
   const dc = new DrawContext(); dc.size = new Size(bw, bh); dc.opaque = true; dc.respectScreenScale = true;
-  const N = 36; for (let i = 0; i < N; i++) { dc.setFillColor(farbe(mischHex(P[0], P[1], i / (N - 1)))); dc.fillRect(new Rect(0, bh * i / N, bw, bh / N + 1)); }
-  const fleck = (fx, fy, rx, ry, [r, g, b, a]) => {
-    const n = 16, ai = 1 - Math.pow(1 - a, 1 / n), c = new Color("#" + hex2(r) + hex2(g) + hex2(b), ai);
-    for (let k = n; k >= 1; k--) { const s = k / n; dc.setFillColor(c); dc.fillEllipse(new Rect(fx * bw - rx * bw * s, fy * bh - ry * bh * s, 2 * rx * bw * s, 2 * ry * bh * s)); }
-  };
-  fleck(.1, .25, .55, .42, P[2]); fleck(.9, .08, .45, .35, P[4]); fleck(.78, .88, .6, .42, P[3]); fleck(.15, .98, .35, .3, P[2]);
-  return dc.getImage();
-}
-// Gigio Fell: das Fellfoto der App, einmal geladen und gespeichert, abgedunkelt, damit die Schrift auf dem weissen Latz lesbar bleibt
-async function fellBild(bw, bh) {
-  const pfad = datei("fell.jpg"); let img = null;
-  try { if (fm.fileExists(pfad)) img = fm.readImage(pfad); } catch (e) {}
-  if (!img) { try { const r = new Request(BASIS + "fell.jpg"); r.timeoutInterval = 8; img = await r.loadImage(); fm.writeImage(pfad, img); } catch (e) {} }
-  if (!img) return null;
-  const dc = new DrawContext(); dc.size = new Size(bw, bh); dc.opaque = true; dc.respectScreenScale = true;
-  const s = Math.max(bw / img.size.width, bh / img.size.height), w = img.size.width * s, h = img.size.height * s;
-  dc.drawImageInRect(img, new Rect((bw - w) / 2, 0, w, h));
-  dc.setFillColor(new Color("#000000", .45)); dc.fillRect(new Rect(0, 0, bw, bh));
+  dc.setFillColor(farbe(f0)); dc.fillRect(new Rect(0, 0, bw, bh));
+  const d0 = Math.max(bw, bh) * .78; dc.setFillColor(farbe(f1)); dc.fillEllipse(new Rect(bw - d0 * .62, -d0 * .28, d0, d0));      // Kreis oben rechts
+  // den Musterblock der App laesst das Widget weg: dahinter steht ueberall Schrift
+  dc.setFillColor(farbe(f3)); dc.fillRect(new Rect(0, bh * .58, bw, 3));                                                              // Linie quer
+  dc.setFillColor(new Color("#000000", .22)); dc.fillRect(new Rect(0, 0, bw, bh));                                                  // etwas abdunkeln, damit die Schrift lesbar bleibt
   return dc.getImage();
 }
 // Groesse der Widgets in Punkten je iPhone-Breite (fuer das Hintergrundbild und die Grafik)
@@ -180,9 +169,8 @@ function masse() {
 async function hintergrund(w) {
   const sky = skyFor(d.charakter, d.nacht), m = masse();
   const [bw, bh] = FAMILIE === "small" ? [m.klein, m.klein] : FAMILIE === "medium" ? [m.breit, m.klein] : [m.breit, m.hoch];
-  if (LOOK === "gigio") { const b = await fellBild(bw, bh); if (b) { w.backgroundImage = b; return; } }
-  if (LOOK === "modern") { w.backgroundImage = auroraBild(sky, bw, bh); return; }
-  const [a, b] = KLASSISCH[sky] || KLASSISCH.bewoelkt;
+  if (LOOK === "modern") { w.backgroundImage = plakatBild(sky, bw, bh); return; }
+  const [a, b] = LOOK === "dark" ? ["#0a0b0d", DARK[sky] || "#111316"] : KLASSISCH[sky] || KLASSISCH.bewoelkt;
   const g = new LinearGradient(); g.colors = [farbe(a), farbe(b)]; g.locations = [0, 1]; g.startPoint = new Point(0, 0); g.endPoint = new Point(0, 1); w.backgroundGradient = g;
 }
 // Farbton eines Tages wie in der App: Regen blau, Sonne gelb, Wolken grau
