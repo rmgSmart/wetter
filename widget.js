@@ -136,7 +136,7 @@ function skyFor(ch, nacht) {
 const KLASSISCH = { sonnig: ["#0a3a8c", "#2a6cc0"], heiter: ["#143c74", "#3a6aa4"], bewoelkt: ["#27323f", "#4a5866"], regen: ["#18222d", "#33424f"],
   gewitter: ["#15122a", "#352f50"], sturm: ["#172632", "#37505d"], hitze: ["#6e2010", "#ad541c"], schnee: ["#2c3c52", "#5f7390"], nebel: ["#30363c", "#5a6168"],
   frost: ["#123a5c", "#3d6d94"], "nacht-klar": ["#050a1c", "#1a2550"], "nacht-trueb": ["#10151c", "#2a323d"], "nacht-regen": ["#0b1119", "#212c39"], "nacht-schnee": ["#131d30", "#3c4b63"] };
-// Modern als Plakat wie in der App: Flaeche, Kreis, Linie (Farben je Wetter: Flaeche, Kreis, Muster, Akzent, Musterart)
+// Modern als Plakat wie in der App: Flaeche und Kreis (ohne Linie, die stoert hinter den Tagen) (Farben je Wetter: Flaeche, Kreis, Muster, Akzent, Musterart)
 const PLAKAT = { sonnig: ["#1d3fd1", "#ffc400", "#ff4a2a", "#ffc400", "voll"], heiter: ["#2b5fd9", "#ffd84d", "#f2efe6", "#ffd84d", "voll"],
   bewoelkt: ["#3b4250", "#c9ccd2", "#e9e4d8", "#e9e4d8", "voll"], regen: ["#12305e", "#5fa8ff", "#8fd0ff", "#8fd0ff", "streifen"],
   gewitter: ["#22123f", "#ffd400", "#ff3d7f", "#ffd400", "streifen"], sturm: ["#0f3b3d", "#e9e4d8", "#2fd1b0", "#2fd1b0", "schraeg"],
@@ -150,12 +150,11 @@ const DARK = { sonnig: "#16140f", heiter: "#16140f", hitze: "#19100d", regen: "#
 const hex2 = n => Math.round(n).toString(16).padStart(2, "0");
 const mischHex = (a, b, k) => "#" + [1, 3, 5].map(i => hex2(parseInt(a.substr(i, 2), 16) * (1 - k) + parseInt(b.substr(i, 2), 16) * k)).join("");
 function plakatBild(sky, bw, bh) {
-  const [f0, f1, , f3] = PLAKAT[sky] || PLAKAT.bewoelkt;
+  const [f0, f1] = PLAKAT[sky] || PLAKAT.bewoelkt;
   const dc = new DrawContext(); dc.size = new Size(bw, bh); dc.opaque = true; dc.respectScreenScale = true;
   dc.setFillColor(farbe(f0)); dc.fillRect(new Rect(0, 0, bw, bh));
   const d0 = Math.max(bw, bh) * .78; dc.setFillColor(new Color(f1, .38)); dc.fillEllipse(new Rect(bw - d0 * .62, -d0 * .28, d0, d0));      // Kreis oben rechts
   // den Musterblock der App laesst das Widget weg: dahinter steht ueberall Schrift
-  dc.setFillColor(new Color(f3, .45)); dc.fillRect(new Rect(0, bh * .58, bw, 3));                                                              // Linie quer
   dc.setFillColor(new Color("#08090c", .5)); dc.fillRect(new Rect(0, 0, bw, bh));                                                  // etwas abdunkeln, damit die Schrift lesbar bleibt
   return dc.getImage();
 }
